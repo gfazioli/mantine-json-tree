@@ -1,8 +1,8 @@
 {
-  "name": "@gfazioli/mantine-spinner",
+  "name": "@gfazioli/mantine-json-tree",
   "version": "2.3.4",
   "description": "A Mantine React component offers customizable loading animations to enhance the user experience in React applications.",
-  "homepage": "https://gfazioli.github.io/mantine-spinner/",
+  "homepage": "https://gfazioli.github.io/mantine-json-tree/",
   "packageManager": "yarn@4.0.1",
   "license": "MIT",
   "author": "Giovambattista Fazioli <giovambattista.fazioli@gmail.com>",
@@ -14,7 +14,7 @@
     "react",
     "react-component",
     "scroll",
-    "spinner",
+    "json-tree",
     "typescript"
   ],
   "main": "./dist/cjs/index.cjs",
@@ -34,12 +34,12 @@
     "./styles.css": "./dist/styles.css",
     "./styles.layer.css": "./dist/styles.layer.css"
   },
-  "repository": "https://github.com/gfazioli/mantine-spinner.git",
+  "repository": "https://github.com/gfazioli/mantine-json-tree.git",
   "peerDependencies": {
     "@mantine/core": ">=7.0.0",
     "@mantine/hooks": ">=7.0.0",
     "react": "^18.x || ^19.x",
     "react-dom": "^18.x || ^19.x"
   },
-  "bugs": "https://github.com/gfazioli/mantine-spinner/issues"
+  "bugs": "https://github.com/gfazioli/mantine-json-tree/issues"
 }

@@ -3,37 +3,37 @@ import * as demos from './demos';
 
 ## Installation
 
-<InstallScript packages="@gfazioli/mantine-spinner" />
+<InstallScript packages="@gfazioli/mantine-json-tree" />
 
 After installation import package styles at the root of your application:
 
 ```tsx
-import '@gfazioli/mantine-spinner/styles.css';
+import '@gfazioli/mantine-json-tree/styles.css';
 ```
 
-You can import styles within a layer `@layer mantine-spinner` by importing `@gfazioli/mantine-spinner/styles.layer.css` file.
+You can import styles within a layer `@layer mantine-json-tree` by importing `@gfazioli/mantine-json-tree/styles.layer.css` file.
 
 ```tsx
-import '@gfazioli/mantine-spinner/styles.layer.css';
+import '@gfazioli/mantine-json-tree/styles.layer.css';
 ```
 
 ## Usage
 
 > **Note:**
-> The `Spinner` component renders only on the client side to avoid hydration mismatches in SSR (Server-Side Rendering) environments. This is necessary because the SVG coordinates are calculated with floating-point math, which can differ between server and client. If you use SSR, the spinner will appear only after the client has mounted.
+> The `JsonTree` component renders only on the client side to avoid hydration mismatches in SSR (Server-Side Rendering) environments. This is necessary because the SVG coordinates are calculated with floating-point math, which can differ between server and client. If you use SSR, the json-tree will appear only after the client has mounted.
 
-The `Spinner` enables the creation of a captivating spinner effect, which enhances the visual dynamics of a user interface. This effect can be used to draw attention, indicate loading processes, or provide an interactive experience that engages users effectively. By implementing this spinner effect, developers can improve the overall aesthetic appeal and functionality of their applications, ensuring a more seamless and enjoyable user experience.
+The `JsonTree` enables the creation of a captivating json-tree effect, which enhances the visual dynamics of a user interface. This effect can be used to draw attention, indicate loading processes, or provide an interactive experience that engages users effectively. By implementing this json-tree effect, developers can improve the overall aesthetic appeal and functionality of their applications, ensuring a more seamless and enjoyable user experience.
 
 <Demo data={demos.configurator} />
 
 ## Styled
 
-Of course, you can style the spinner as you like. For example, by adding an additional animation effect on the whole spinner.
+Of course, you can style the json-tree as you like. For example, by adding an additional animation effect on the whole json-tree.
 
 <Demo data={demos.styled} />
 
 ## Example: Random
 
-Random spinner effect. Use it to create a loading effect.
+Random json-tree effect. Use it to create a loading effect.
 
 <Demo data={demos.random} />

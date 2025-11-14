@@ -25,12 +25,12 @@ export interface PackageData {
 }
 
 export const PACKAGE_DATA: PackageData = {
-  packageName: '@gfazioli/mantine-spinner',
+  packageName: '@gfazioli/mantine-json-tree',
   packageDescription:
     'A Mantine React component offers customizable loading animations to enhance the user experience in React applications.',
-  mdxFileUrl: 'https://github.com/gfazioli/mantine-spinner/blob/master/docs/docs.mdx',
-  repositoryUrl: 'https://github.com/gfazioli/mantine-spinner',
-  licenseUrl: 'https://github.com/gfazioli/mantine-spinner/blob/master/LICENSE',
+  mdxFileUrl: 'https://github.com/gfazioli/mantine-json-tree/blob/master/docs/docs.mdx',
+  repositoryUrl: 'https://github.com/gfazioli/mantine-json-tree',
+  licenseUrl: 'https://github.com/gfazioli/mantine-json-tree/blob/master/LICENSE',
   author: {
     name: 'Giovambattista Fazioli',
     githubUsername: 'gfazioli',

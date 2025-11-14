@@ -1,0 +1,71 @@
+.root {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-xs);
+  padding: var(--mantine-spacing-md);
+  background-color: var(--mantine-color-dark-8);
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-dark-5);
+
+  /* JSON type colors - customizable via CSS variables */
+  --json-tree-color-string: var(--mantine-color-green-7);
+  --json-tree-color-number: var(--mantine-color-blue-7);
+  --json-tree-color-boolean: var(--mantine-color-orange-7);
+  --json-tree-color-null: var(--mantine-color-gray-6);
+  --json-tree-color-key: var(--mantine-color-blue-5);
+
+  &[data-variant='compact'] {
+    padding: var(--mantine-spacing-sm);
+    font-size: var(--mantine-font-size-xs);
+  }
+}
+
+.key {
+  font-weight: 500;
+  font-size: inherit;
+  color: var(--json-tree-color-key);
+}
+
+.value {
+  font-family: var(--mantine-font-family-monospace);
+  padding: 2px 6px;
+  border-radius: var(--mantine-radius-sm);
+  background-color: transparent;
+  font-size: inherit;
+
+  &[data-type='string'] {
+    color: var(--json-tree-color-string);
+  }
+
+  &[data-type='number'] {
+    color: var(--json-tree-color-number);
+  }
+
+  &[data-type='boolean'] {
+    color: var(--json-tree-color-boolean);
+  }
+
+  &[data-type='null'],
+  &[data-type='undefined'] {
+    color: var(--json-tree-color-null);
+    font-style: italic;
+  }
+}
+
+.bracket {
+  font-weight: 700;
+  font-family: var(--mantine-font-family-monospace);
+  user-select: none;
+}
+
+.copyButton {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+
+  &:focus {
+    opacity: 1;
+  }
+}
+
+.root:hover .copyButton {
+  opacity: 1;
+}

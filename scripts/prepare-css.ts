@@ -14,7 +14,7 @@ const content = fs.readFileSync(rollupCssFilePath, 'utf-8');
 fs.writeFileSync(path.join(process.cwd(), './package/dist/styles.css'), content);
 fs.writeFileSync(
   path.join(process.cwd(), './package/dist/styles.layer.css'),
-  `@layer mantine-spinner {${content}}`
+  `@layer mantine-json-tree {${content}}`
 );
 
 fs.removeSync(rollupCssFilePath);

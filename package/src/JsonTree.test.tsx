@@ -1,10 +1,10 @@
 import React from 'react';
 import { render } from '@mantine-tests/core';
-import { Spinner } from './Spinner';
+import { JsonTree } from './JsonTree';
 
-describe('Spinner', () => {
+describe('JsonTree', () => {
   it('renders without crashing', () => {
-    const { container } = render(<Spinner />);
+    const { container } = render(<JsonTree data={[]} />);
     expect(container).toBeTruthy();
   });
 });

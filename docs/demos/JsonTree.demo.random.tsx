@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Spinner, SpinnerProps } from '@gfazioli/mantine-spinner';
+import { JsonTree, JsonTreeProps } from '@gfazioli/mantine-json-tree';
 import { CodeHighlight } from '@mantine/code-highlight';
 import { Button, Center, Stack } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
 
 function Demo() {
-  const [props, setProps] = useState<SpinnerProps>();
+  const [props, setProps] = useState<JsonTreeProps>();
 
   interface RandomInRangeParams {
     min: number;
@@ -42,7 +42,7 @@ function Demo() {
     <>
       <Stack align="center" gap={64} mb={32}>
         <Center h={200} w={200}>
-          <Spinner {...props} />
+          <JsonTree {...props} />
         </Center>
         <Button onClick={random}>Random</Button>
       </Stack>
@@ -50,7 +50,7 @@ function Demo() {
         w={{ base: 'auto', lg: 800 }}
         radius={32}
         language="tsx"
-        code={`<Spinner ${codeProps} />`}
+        code={`<JsonTree ${codeProps} />`}
       />
     </>
   );

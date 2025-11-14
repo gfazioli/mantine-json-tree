@@ -1,8 +1,8 @@
-export { Spinner } from './Spinner';
+export { JsonTree } from './JsonTree';
 export type {
-  SpinnerBaseProps,
-  SpinnerCssVariables,
-  SpinnerFactory,
-  SpinnerProps,
-  SpinnerStylesNames,
-} from './Spinner';
+  JsonTreeBaseProps,
+  JsonTreeCssVariables,
+  JsonTreeFactory,
+  JsonTreeProps,
+  JsonTreeStylesNames,
+} from './JsonTree';

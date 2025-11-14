@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gfazioli/mantine-spinner": "workspace:*",
+    "@gfazioli/mantine-json-tree": "workspace:*",
     "@mantine/code-highlight": "8.3.7",
     "@mantine/core": "8.3.7",
     "@mantine/dates": "^8.3.7",

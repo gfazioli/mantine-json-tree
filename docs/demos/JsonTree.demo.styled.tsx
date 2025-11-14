@@ -1,26 +1,26 @@
-import { Spinner } from '@gfazioli/mantine-spinner';
+import { JsonTree } from '@gfazioli/mantine-json-tree';
 import { Group } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
-import classes from './Spinner.module.css';
+import classes from './JsonTree.module.css';
 
 function Demo() {
   return (
     <Group align="center" justify="center" gap={100}>
-      <Spinner className={classes.pulse} />
-      <Spinner className={classes.rotate} />
+      <JsonTree className={classes.pulse} />
+      <JsonTree className={classes.rotate} />
     </Group>
   );
 }
 
 const code = `
-import { Spinner } from "@gfazioli/mantine-spinner";
-import classes from './Spinner.module.css';
+import { JsonTree } from "@gfazioli/mantine-json-tree";
+import classes from './JsonTree.module.css';
 
 function Demo() {
   return (
     <Group align="center" justify="center" gap={100}>
-      <Spinner className={classes.pulse} />
-      <Spinner className={classes.rotate} />
+      <JsonTree className={classes.pulse} />
+      <JsonTree className={classes.rotate} />
     </Group>
   );
 }
@@ -72,6 +72,6 @@ export const styled: MantineDemo = {
   defaultExpanded: false,
   code: [
     { fileName: 'Demo.tsx', code, language: 'tsx' },
-    { fileName: 'Spinner.module.css', code: moduleCss, language: 'css' },
+    { fileName: 'JsonTree.module.css', code: moduleCss, language: 'css' },
   ],
 };

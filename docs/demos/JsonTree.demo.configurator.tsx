@@ -1,20 +1,20 @@
-import { Spinner, SpinnerProps } from '@gfazioli/mantine-spinner';
+import { JsonTree, JsonTreeProps } from '@gfazioli/mantine-json-tree';
 import { Center } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
 
-function Demo(props: SpinnerProps) {
+function Demo(props: JsonTreeProps) {
   return (
     <Center h={400}>
-      <Spinner {...props} />
+      <JsonTree {...props} />
     </Center>
   );
 }
 
 const code = `
-import { Spinner } from "@gfazioli/mantine-spinner";
+import { JsonTree } from "@gfazioli/mantine-json-tree";
 
 function Demo() {
-  return <Spinner{{props}} />;
+  return <JsonTree{{props}} />;
 }
 `;
 

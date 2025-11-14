@@ -1,5 +1,5 @@
-import { SpinnerStylesApi } from './Spinner.styles-api';
+import { JsonTreeStylesApi } from './JsonTree.styles-api';
 
 export const STYLES_API_DATA = {
-  Spinner: SpinnerStylesApi,
+  JsonTree: JsonTreeStylesApi,
 };
