@@ -19,9 +19,15 @@ export type ValueType = 'object' | 'array' | 'string' | 'number' | 'boolean' | '
  * Get the type of a value for display purposes.
  */
 export function getValueType(value: any): ValueType {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (Array.isArray(value)) return 'array';
+  if (value === null) {
+    return 'null';
+  }
+  if (value === undefined) {
+    return 'undefined';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
   return typeof value as ValueType;
 }
 
@@ -30,8 +36,12 @@ export function getValueType(value: any): ValueType {
  */
 export function isExpandable(value: any): boolean {
   const type = getValueType(value);
-  if (type === 'object') return Object.keys(value).length > 0;
-  if (type === 'array') return value.length > 0;
+  if (type === 'object') {
+    return Object.keys(value).length > 0;
+  }
+  if (type === 'array') {
+    return value.length > 0;
+  }
   return false;
 }
 
@@ -39,9 +49,15 @@ export function isExpandable(value: any): boolean {
  * Format a primitive value for display.
  */
 export function formatValue(value: any, type: ValueType): string {
-  if (type === 'string') return `"${value}"`;
-  if (type === 'null') return 'null';
-  if (type === 'undefined') return 'undefined';
+  if (type === 'string') {
+    return `"${value}"`;
+  }
+  if (type === 'null') {
+    return 'null';
+  }
+  if (type === 'undefined') {
+    return 'undefined';
+  }
   return String(value);
 }
 
@@ -49,9 +65,13 @@ export function formatValue(value: any, type: ValueType): string {
  * Get the count of items in an object or array.
  */
 export function getItemCount(value: any): number {
-  if (Array.isArray(value)) return value.length;
-  if (typeof value === 'object' && value !== null) return Object.keys(value).length;
-  return 0;
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.keys(value).length;
+    return 0;
+  }
 }
 
 /**

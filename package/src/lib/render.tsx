@@ -6,9 +6,10 @@ import {
   Code,
   Group,
   Text,
-  Tooltip,
+  type MantineTheme,
   type RenderTreeNodePayload,
 } from '@mantine/core';
+import type { JsonTreeProps } from '../JsonTree';
 import { formatValue, type JSONTreeNodeData, type ValueType } from './utils';
 import classes from '../JsonTree.module.css';
 
@@ -17,15 +18,19 @@ import classes from '../JsonTree.module.css';
  */
 export function renderJSONNode(
   { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
-  theme: any,
+  theme: MantineTheme,
+  props: JsonTreeProps,
   onNodeClick?: (path: string, value: any) => void
 ) {
   const jsonNode = node as JSONTreeNodeData;
+
   const { type, value, key, path, itemCount } = jsonNode.nodeData || {
     type: 'null' as ValueType,
     value: null,
     path: 'unknown',
   };
+
+  const { showItemsCount, withCopyToClipboard } = props;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,7 +79,8 @@ export function renderJSONNode(
         <Code className={classes.value} data-type={type}>
           {formatValue(value, type)}
         </Code>
-        <Tooltip label="Copy value">
+
+        {withCopyToClipboard && (
           <ActionIcon
             size="xs"
             variant="subtle"
@@ -84,7 +90,7 @@ export function renderJSONNode(
           >
             <IconCopy size={12} />
           </ActionIcon>
-        </Tooltip>
+        )}
       </Group>
     );
   }
@@ -129,7 +135,7 @@ export function renderJSONNode(
         </>
       )}
 
-      <Text component="span" className={classes.bracket} c="dimmed">
+      <Text component="span" className={classes.bracket}>
         {openBracket}
       </Text>
 
@@ -138,10 +144,10 @@ export function renderJSONNode(
           <Text component="span" c="dimmed" size="xs">
             ...
           </Text>
-          <Text component="span" className={classes.bracket} c="dimmed">
+          <Text component="span" className={classes.bracket}>
             {closeBracket}
           </Text>
-          {itemCount !== undefined && (
+          {itemCount !== undefined && showItemsCount && (
             <Badge size="xs" variant="light" color="gray">
               {itemCount}
             </Badge>
@@ -149,7 +155,7 @@ export function renderJSONNode(
         </>
       )}
 
-      <Tooltip label="Copy value">
+      {withCopyToClipboard && (
         <ActionIcon
           size="xs"
           variant="subtle"
@@ -159,7 +165,7 @@ export function renderJSONNode(
         >
           <IconCopy size={12} />
         </ActionIcon>
-      </Tooltip>
+      )}
     </Group>
   );
 }

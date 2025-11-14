@@ -6,12 +6,13 @@ import {
   createVarsResolver,
   Factory,
   factory,
+  getFontSize,
   getTreeExpandedState,
   Group,
   MantineSize,
   px,
+  rem,
   StylesApiProps,
-  Tooltip,
   Tree,
   useMantineTheme,
   useProps,
@@ -25,30 +26,54 @@ import classes from './JsonTree.module.css';
 
 export type JsonTreeDirection = 'clockwise' | 'counter-clockwise';
 
-export type JsonTreeStylesNames = 'root';
+export type JsonTreeStylesNames = 'root' | 'header';
 
 export type JsonTreeCssVariables = {
-  root: '--json-tree-padding';
+  root:
+    | '--json-tree-font-family'
+    | '--json-tree-color-string'
+    | '--json-tree-color-number'
+    | '--json-tree-color-boolean'
+    | '--json-tree-color-null'
+    | '--json-tree-color-key';
+  header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
 };
 
 export interface JsonTreeBaseProps {
   /** The data to display (object, array, or any JSON-serializable value) */
-  data: any;
+  data: unknown;
 
-  /** Whether nodes should be expanded by default */
+  /** Whether nodes should be expanded by default @default false */
   defaultExpanded?: boolean;
 
-  /** Maximum depth to auto-expand (0 = collapsed, -1 = expand all) */
+  /** Maximum depth to auto-expand (0 = collapsed, -1 = expand all) @default 2 */
   maxDepth?: number;
-
-  /** Visual variant of the tree viewer */
-  mode?: 'default' | 'compact';
 
   /** Callback when a node is clicked */
   onNodeClick?: (path: string, value: any) => void;
 
-  /** Whether to show the root expand/collapse all button */
-  showExpandAll?: boolean;
+  onCopy?: (value: unknown) => void;
+
+  /** Whether to show the root expand/collapse all button @default false */
+  withExpandAll?: boolean;
+
+  /** Size of the font @default 'xs' */
+  size?: MantineSize | (string & {}) | number;
+
+  /** Title displayed above the JSON tree  */
+  title?: React.ReactNode;
+
+  /** Whether to show item counts for objects and arrays @default false */
+  showItemsCount?: boolean;
+
+  /** Whether to show a copy to clipboard button for each node @default false */
+  withCopyToClipboard?: boolean;
+
+  /** If set, the header is sticky @default `false` */
+  stickyHeader?: boolean;
+
+  /** Offset for the sticky header (e.g. to account for a fixed navbar) @default 0*/
+  stickyHeaderOffset?: number | string;
 }
 
 export interface JsonTreeProps
@@ -65,18 +90,33 @@ export type JsonTreeFactory = Factory<{
 
 export const defaultProps: Partial<JsonTreeProps> = {
   defaultExpanded: false,
-  maxDepth: 1,
-  mode: 'default',
-  showExpandAll: true,
+  maxDepth: 2,
+  withExpandAll: false,
+  showItemsCount: false,
+  withCopyToClipboard: false,
+  stickyHeader: false,
 };
 
-const varsResolver = createVarsResolver<JsonTreeFactory>((_, { maxDepth }) => {
-  return {
-    root: {
-      '--json-tree-padding': maxDepth.toString(),
-    },
-  };
-});
+const varsResolver = createVarsResolver<JsonTreeFactory>(
+  (_, { size, stickyHeader, stickyHeaderOffset }) => {
+    return {
+      root: {
+        '--json-tree-font-family': 'var(--mantine-font-family-monospace)',
+        '--json-tree-color-string': 'var(--mantine-color-green-7)',
+        '--json-tree-color-number': 'var(--mantine-color-violet-7)',
+        '--json-tree-color-boolean': 'var(--mantine-color-orange-7)',
+        '--json-tree-color-null': 'var(--mantine-color-gray-6)',
+        '--json-tree-color-key': 'var(--mantine-color-blue-5)',
+        '--json-tree-font-size': getFontSize(size) || 'var(--mantine-font-size-xs)',
+        '--json-tree-color-bracket': 'var(--mantine-color-gray-5)',
+      },
+      header: {
+        '--json-tree-header-background-color': 'inherit',
+        '--json-tree-header-sticky-offset': stickyHeader ? rem(stickyHeaderOffset) : undefined,
+      },
+    };
+  }
+);
 
 export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   const props = useProps('JsonTree', defaultProps, _props);
@@ -85,10 +125,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     data,
     defaultExpanded,
     maxDepth,
-    mode,
     onNodeClick,
-    showExpandAll,
+    withExpandAll,
     variant,
+    title,
+    showItemsCount,
+    withCopyToClipboard,
+    stickyHeaderOffset,
+    stickyHeader,
 
     classNames,
     style,
@@ -161,45 +205,28 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   });
 
   return (
-    <Box ref={ref} {...getStyles('root')} data-variant={variant} {...props}>
-      {showExpandAll && isExpandable(data) && (
-        <Group
-          mt={-14}
-          mr={-10}
-          bg="dark.8"
-          gap="xs"
-          mb="sm"
-          justify="flex-end"
-          pos="sticky"
-          style={{ top: 10, zIndex: 1, borderRadius: '8px' }}
-        >
-          <Tooltip zIndex={9999} label="Expand all nodes" withArrow withinPortal>
-            <ActionIcon
-              size="xs"
-              variant="light"
-              color="blue"
-              onClick={() => tree.expandAllNodes()}
-            >
-              <IconLibraryPlus size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip zIndex={9999} label="Collapse all nodes" withArrow withinPortal>
-            <ActionIcon
-              size="xs"
-              variant="light"
-              color="blue"
-              onClick={() => tree.collapseAllNodes()}
-            >
-              <IconLibraryMinus size={16} />
-            </ActionIcon>
-          </Tooltip>
+    <Box ref={ref} {...getStyles('root')} {...others}>
+      {(title || withExpandAll) && (
+        <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
+          {title || <div />}
+          {withExpandAll && isExpandable(data) && (
+            <Group gap="xs" style={{ top: 10, zIndex: 1, borderRadius: '8px' }}>
+              <ActionIcon size="xs" variant="transparent" onClick={() => tree.expandAllNodes()}>
+                <IconLibraryPlus size={16} />
+              </ActionIcon>
+
+              <ActionIcon size="xs" variant="transparent" onClick={() => tree.collapseAllNodes()}>
+                <IconLibraryMinus size={16} />
+              </ActionIcon>
+            </Group>
+          )}
         </Group>
       )}
       <Tree
         data={treeData}
         tree={tree}
         levelOffset={32}
-        renderNode={(payload) => renderJSONNode(payload, theme, onNodeClick)}
+        renderNode={(payload) => renderJSONNode(payload, theme, props, onNodeClick)}
       />
     </Box>
   );

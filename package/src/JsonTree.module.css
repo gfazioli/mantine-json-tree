@@ -1,22 +1,6 @@
 .root {
-  font-family: var(--mantine-font-family-monospace);
-  font-size: var(--mantine-font-size-xs);
-  padding: var(--mantine-spacing-md);
-  background-color: var(--mantine-color-dark-8);
-  border-radius: var(--mantine-radius-md);
-  border: 1px solid var(--mantine-color-dark-5);
-
-  /* JSON type colors - customizable via CSS variables */
-  --json-tree-color-string: var(--mantine-color-green-7);
-  --json-tree-color-number: var(--mantine-color-blue-7);
-  --json-tree-color-boolean: var(--mantine-color-orange-7);
-  --json-tree-color-null: var(--mantine-color-gray-6);
-  --json-tree-color-key: var(--mantine-color-blue-5);
-
-  &[data-variant='compact'] {
-    padding: var(--mantine-spacing-sm);
-    font-size: var(--mantine-font-size-xs);
-  }
+  font-family: var(--json-tree-font-family);
+  font-size: var(--json-tree-font-size);
 }
 
 .key {
@@ -26,7 +10,7 @@
 }
 
 .value {
-  font-family: var(--mantine-font-family-monospace);
+  font-family: var(--json-tree-font-family);
   padding: 2px 6px;
   border-radius: var(--mantine-radius-sm);
   background-color: transparent;
@@ -51,9 +35,21 @@
   }
 }
 
+.header {
+  background-color: var(--json-tree-header-background-color, inherit);
+  padding: var(--mantine-spacing-xs);
+  &[data-sticky='true'] {
+    position: sticky;
+    top: var(--json-tree-header-sticky-offset, 0);
+    z-index: 3;
+  }
+}
+
 .bracket {
   font-weight: 700;
-  font-family: var(--mantine-font-family-monospace);
+  font-size: inherit;
+  font-family: var(--json-tree-font-family);
+  color: var(--json-tree-color-bracket);
   user-select: none;
 }
 
