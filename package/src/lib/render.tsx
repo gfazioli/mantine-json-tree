@@ -30,23 +30,16 @@ export function renderJSONNode(
     path: 'unknown',
   };
 
-  const { showItemsCount, withCopyToClipboard } = props;
+  const { showItemsCount, withCopyToClipboard, onCopy } = props;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(JSON.stringify(value, null, 2));
-      //   notifications.show({
-      //     title: 'Copied',
-      //     message: 'Value copied to clipboard',
-      //     color: 'green',
-      //   });
+      const copy = JSON.stringify(value, null, 2);
+      await navigator.clipboard.writeText(copy);
+      onCopy?.(copy, value);
     } catch (error) {
-      //   notifications.show({
-      //     title: 'Error',
-      //     message: 'Failed to copy to clipboard',
-      //     color: 'red',
-      //   });
+      // =jon= future use: Handle copy error if needed
     }
   };
 

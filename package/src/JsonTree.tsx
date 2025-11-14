@@ -52,7 +52,8 @@ export interface JsonTreeBaseProps {
   /** Callback when a node is clicked */
   onNodeClick?: (path: string, value: any) => void;
 
-  onCopy?: (value: unknown) => void;
+  /** Callback when a value is copied to clipboard */
+  onCopy?: (copy: string, value: unknown) => void;
 
   /** Whether to show the root expand/collapse all button @default false */
   withExpandAll?: boolean;
@@ -126,6 +127,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     defaultExpanded,
     maxDepth,
     onNodeClick,
+    onCopy,
     withExpandAll,
     variant,
     title,
