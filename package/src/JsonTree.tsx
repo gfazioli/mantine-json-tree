@@ -36,7 +36,12 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-null'
     | '--json-tree-color-key'
     | '--json-tree-font-size'
-    | '--json-tree-color-bracket';
+    | '--json-tree-color-bracket'
+    | '--json-tree-indent-guide-color-0'
+    | '--json-tree-indent-guide-color-1'
+    | '--json-tree-indent-guide-color-2'
+    | '--json-tree-indent-guide-color-3'
+    | '--json-tree-indent-guide-color-4';
   header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
 };
 
@@ -71,6 +76,9 @@ export interface JsonTreeBaseProps {
   /** Whether to show a copy to clipboard button for each node @default false */
   withCopyToClipboard?: boolean;
 
+  /** Whether to show indent guides (vertical lines) for nested nodes @default false */
+  showIndentGuides?: boolean;
+
   /** If set, the header is sticky @default `false` */
   stickyHeader?: boolean;
 
@@ -96,6 +104,7 @@ export const defaultProps: Partial<JsonTreeProps> = {
   withExpandAll: false,
   showItemsCount: false,
   withCopyToClipboard: false,
+  showIndentGuides: false,
   stickyHeader: false,
 };
 
@@ -111,6 +120,11 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-key': 'var(--mantine-color-blue-5)',
         '--json-tree-font-size': getFontSize(size) || 'var(--mantine-font-size-xs)',
         '--json-tree-color-bracket': 'var(--mantine-color-gray-5)',
+        '--json-tree-indent-guide-color-0': 'var(--mantine-color-blue-4)',
+        '--json-tree-indent-guide-color-1': 'var(--mantine-color-lime-4)',
+        '--json-tree-indent-guide-color-2': 'var(--mantine-color-violet-4)',
+        '--json-tree-indent-guide-color-3': 'var(--mantine-color-green-4)',
+        '--json-tree-indent-guide-color-4': 'var(--mantine-color-lime-4)',
       },
       header: {
         '--json-tree-header-background-color': 'inherit',
@@ -134,6 +148,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     title,
     showItemsCount,
     withCopyToClipboard,
+    showIndentGuides,
     stickyHeaderOffset,
     stickyHeader,
 

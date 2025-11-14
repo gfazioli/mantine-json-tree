@@ -24,19 +24,10 @@ export const configurator: MantineDemo = {
   ],
   controls: [
     { type: 'string', prop: 'title', initialValue: undefined as any, libraryValue: null },
-    { type: 'boolean', prop: 'defaultExpanded', initialValue: true, libraryValue: false },
-    {
-      type: 'number',
-      prop: 'maxDepth',
-      initialValue: 2,
-      libraryValue: 2,
-      min: 0,
-      max: 10,
-      step: 1,
-    },
-    { type: 'boolean', prop: 'withExpandAll', initialValue: false, libraryValue: false },
-    { type: 'boolean', prop: 'showItemsCount', initialValue: false, libraryValue: false },
-    { type: 'boolean', prop: 'withCopyToClipboard', initialValue: false, libraryValue: false },
     { type: 'size', prop: 'size', initialValue: 'xs', libraryValue: 'xs' },
+    { type: 'boolean', prop: 'withExpandAll', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'withCopyToClipboard', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'showIndentGuides', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'showItemsCount', initialValue: false, libraryValue: false },
   ],
 };

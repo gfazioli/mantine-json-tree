@@ -5,7 +5,15 @@ import classes from './JsonTree.module.css';
 
 function Demo() {
   return (
-    <JsonTree classNames={classes} title="demo.json" defaultExpanded maxDepth={1} data={data} />
+    <JsonTree
+      classNames={classes}
+      title="demo.json"
+      showIndentGuides
+      defaultExpanded
+      maxDepth={1}
+      data={data}
+      style={{ '--json-tree-color-string': 'red' }}
+    />
   );
 }
 
@@ -15,16 +23,34 @@ import classes from './JsonTree.module.css';
 import { data } from './data';
 
 function Demo() {
-  return <JsonTree className={classes.root} defaultExpanded maxDepth={1} data={data} />;
+  return (
+    <JsonTree
+      classNames={classes}
+      title="demo.json"
+      showIndentGuides
+      defaultExpanded
+      maxDepth={1}
+      data={data}
+      style={{ '--json-tree-color-string': 'red' }}
+    />
+  );
 }
 `;
 
 const moduleCss = `
 .root {
-  background-color: var(--mantine-color-dark-8);
-  padding: var(--mantine-spacing-md);
-  border-radius: var(--mantine-radius-md);
+  --json-tree-indent-guide-color-0: red !important;
+}
+
+.header {
+  background-color: var(--mantine-color-dark-7);
+  border-radius: var(--mantine-radius-sm);
   border: 1px solid var(--mantine-color-dark-5);
+
+  @mixin where-light {
+    background-color: var(--mantine-color-gray-0);
+    border: 1px solid var(--mantine-color-gray-1);
+  }
 }
 `;
 

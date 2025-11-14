@@ -1,0 +1,16 @@
+.root {
+  --json-tree-color-string: red;
+  --json-tree-font-size: 22px;
+  --json-tree-indent-guide-color-0: white;
+  --json-tree-indent-guide-color-4: white;
+
+  .indentGuide {
+    --json-tree-indent-guide-color-0: white;
+    --json-tree-indent-guide-color-4: white;
+  }
+}
+
+.indentGuide {
+  --json-tree-indent-guide-color-0: white;
+  --json-tree-indent-guide-color-4: white;
+}

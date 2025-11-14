@@ -24,13 +24,21 @@ export function renderJSONNode(
 ) {
   const jsonNode = node as JSONTreeNodeData;
 
-  const { type, value, key, path, itemCount } = jsonNode.nodeData || {
+  const {
+    type,
+    value,
+    key,
+    path,
+    itemCount,
+    depth = 0,
+  } = jsonNode.nodeData || {
     type: 'null' as ValueType,
     value: null,
     path: 'unknown',
+    depth: 0,
   };
 
-  const { showItemsCount, withCopyToClipboard, onCopy } = props;
+  const { showItemsCount, withCopyToClipboard, onCopy, showIndentGuides } = props;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -49,6 +57,29 @@ export function renderJSONNode(
     }
   };
 
+  // Render indent guides (vertical lines)
+  const renderIndentGuides = () => {
+    if (!showIndentGuides || depth === 0) {
+      return null;
+    }
+
+    const guides = [];
+    for (let i = 0; i < depth; i++) {
+      const colorIndex = i % 5;
+      guides.push(
+        <div
+          key={i}
+          className={classes.indentGuide}
+          data-color-index={colorIndex}
+          style={{
+            left: `${i * 32 + 8}px`,
+          }}
+        />
+      );
+    }
+    return guides;
+  };
+
   // Render primitive value
   if (!hasChildren) {
     return (
@@ -57,8 +88,9 @@ export function renderJSONNode(
         wrap="nowrap"
         {...elementProps}
         onClick={handleClick}
-        style={{ cursor: onNodeClick ? 'pointer' : 'default' }}
+        style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
       >
+        {renderIndentGuides()}
         {key !== undefined && (
           <>
             <Text component="span" className={classes.key}>
@@ -98,8 +130,12 @@ export function renderJSONNode(
       wrap="nowrap"
       {...elementProps}
       onClick={handleClick}
-      style={{ cursor: onNodeClick ? 'pointer' : 'default' }}
+      data-expanded={expanded}
+      data-has-children={hasChildren}
+      data-type={type}
+      style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
     >
+      {renderIndentGuides()}
       <ActionIcon
         size="xs"
         variant="subtle"

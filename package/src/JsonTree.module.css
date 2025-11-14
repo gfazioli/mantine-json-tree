@@ -66,3 +66,32 @@
 .root:hover .copyButton {
   opacity: 1;
 }
+
+.indentGuide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  opacity: 0.4;
+
+  &[data-color-index='0'] {
+    background-color: var(--json-tree-indent-guide-color-0);
+  }
+
+  &[data-color-index='1'] {
+    background-color: var(--json-tree-indent-guide-color-1);
+  }
+
+  &[data-color-index='2'] {
+    background-color: var(--json-tree-indent-guide-color-2);
+  }
+
+  &[data-color-index='3'] {
+    background-color: var(--json-tree-indent-guide-color-3);
+  }
+
+  &[data-color-index='4'] {
+    background-color: var(--json-tree-indent-guide-color-4);
+  }
+}

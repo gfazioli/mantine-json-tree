@@ -17,6 +17,11 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-color-key': 'Color for object keys',
       '--json-tree-font-size': 'Font size for the JSON tree',
       '--json-tree-color-bracket': 'Color for brackets and punctuation',
+      '--json-tree-indent-guide-color-0': 'Color for indent guide at level 0 (and every 5th level)',
+      '--json-tree-indent-guide-color-1': 'Color for indent guide at level 1 (and every 5th level)',
+      '--json-tree-indent-guide-color-2': 'Color for indent guide at level 2 (and every 5th level)',
+      '--json-tree-indent-guide-color-3': 'Color for indent guide at level 3 (and every 5th level)',
+      '--json-tree-indent-guide-color-4': 'Color for indent guide at level 4 (and every 5th level)',
     },
     header: {
       '--json-tree-header-background-color': 'Background color for the header',

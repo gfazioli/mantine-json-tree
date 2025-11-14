@@ -7,6 +7,7 @@ export interface JSONTreeNodeData extends TreeNodeData {
     key?: string;
     path: string;
     itemCount?: number;
+    depth?: number;
   };
 }
 
@@ -80,7 +81,8 @@ export function getItemCount(value: any): number {
 export function convertToTreeData(
   value: any,
   key?: string,
-  path: string = 'root'
+  path: string = 'root',
+  depth: number = 0
 ): JSONTreeNodeData {
   const type = getValueType(value);
   const expandable = isExpandable(value);
@@ -90,7 +92,7 @@ export function convertToTreeData(
     return {
       value: nodeValue,
       label: key || 'root',
-      nodeData: { type, value, key, path },
+      nodeData: { type, value, key, path, depth },
     };
   }
 
@@ -99,12 +101,12 @@ export function convertToTreeData(
       ? value.map((item: any, index: number) => [String(index), item] as [string, any])
       : Object.entries(value);
 
-  const children = entries.map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`));
+  const children = entries.map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`, depth + 1));
 
   return {
     value: nodeValue,
     label: key || 'root',
     children,
-    nodeData: { type, value, key, path, itemCount: getItemCount(value) },
+    nodeData: { type, value, key, path, itemCount: getItemCount(value), depth },
   };
 }
