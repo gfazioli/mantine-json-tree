@@ -1,20 +1,18 @@
 {
   "name": "@gfazioli/mantine-json-tree",
-  "version": "2.3.4",
+  "version": "0.9.0",
   "description": "A Mantine React component offers customizable loading animations to enhance the user experience in React applications.",
   "homepage": "https://gfazioli.github.io/mantine-json-tree/",
   "packageManager": "yarn@4.0.1",
   "license": "MIT",
   "author": "Giovambattista Fazioli <giovambattista.fazioli@gmail.com>",
   "keywords": [
-    "animation",
-    "branding",
     "extension",
+    "json-tree",
+    "json-view",
     "mantine",
     "react",
     "react-component",
-    "scroll",
-    "json-tree",
     "typescript"
   ],
   "main": "./dist/cjs/index.cjs",

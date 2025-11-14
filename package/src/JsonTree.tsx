@@ -10,7 +10,6 @@ import {
   getTreeExpandedState,
   Group,
   MantineSize,
-  px,
   rem,
   StylesApiProps,
   Tree,
@@ -158,20 +157,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     vars,
     varsResolver,
   });
-
-  const getSizeValue = (size: MantineSize | (string & {}) | number): number => {
-    if (typeof size === 'string' && ['lg', 'xl', 'md', 'sm', 'xs'].includes(size)) {
-      return {
-        xl: 58,
-        lg: 44,
-        md: 36,
-        sm: 22,
-        xs: 18,
-      }[size];
-    }
-
-    return px(size) as number;
-  };
 
   const theme = useMantineTheme();
 

@@ -36,8 +36,8 @@ export function Usage() {
   return (
     <Stack>
       <JsonTree data={data} />
-      <JsonTree data={'Simple String'} />
-      <JsonTree data={true} />
+      <JsonTree data="Simple String" />
+      <JsonTree data />
       <JsonTree data={false} />
       <JsonTree data={[1, 2, 3]} />
       <JsonTree data={{ on: true }} />

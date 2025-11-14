@@ -18,7 +18,7 @@ import classes from '../JsonTree.module.css';
  */
 export function renderJSONNode(
   { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
-  theme: MantineTheme,
+  _: MantineTheme,
   props: JsonTreeProps,
   onNodeClick?: (path: string, value: any) => void
 ) {

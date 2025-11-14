@@ -38,6 +38,7 @@
 .header {
   background-color: var(--json-tree-header-background-color, inherit);
   padding: var(--mantine-spacing-xs);
+
   &[data-sticky='true'] {
     position: sticky;
     top: var(--json-tree-header-sticky-offset, 0);
