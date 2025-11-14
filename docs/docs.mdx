@@ -19,21 +19,20 @@ import '@gfazioli/mantine-json-tree/styles.layer.css';
 
 ## Usage
 
-> **Note:**
-> The `JsonTree` component renders only on the client side to avoid hydration mismatches in SSR (Server-Side Rendering) environments. This is necessary because the SVG coordinates are calculated with floating-point math, which can differ between server and client. If you use SSR, the json-tree will appear only after the client has mounted.
-
-The `JsonTree` enables the creation of a captivating json-tree effect, which enhances the visual dynamics of a user interface. This effect can be used to draw attention, indicate loading processes, or provide an interactive experience that engages users effectively. By implementing this json-tree effect, developers can improve the overall aesthetic appeal and functionality of their applications, ensuring a more seamless and enjoyable user experience.
+The `JsonTree` is interactive JSON tree viewer component built with Mantine's Tree component. Features collapsible nodes, syntax highlighting with type-specific colors, copy-to-clipboard functionality, item count badges, configurable expansion depth, and smooth animations. Perfect for debugging API responses, exploring complex data structures, and developer tools.
 
 <Demo data={demos.configurator} />
 
 ## Styled
 
-Of course, you can style the json-tree as you like. For example, by adding an additional animation effect on the whole json-tree.
+Of course, you can style the json-tree as you like.
 
 <Demo data={demos.styled} />
 
-## Example: Random
+## Syntax Highlighting
 
-Random json-tree effect. Use it to create a loading effect.
+Of course, you can style the json-tree as you like.
 
-<Demo data={demos.random} />
+<Demo data={demos.syntax} />
+
+

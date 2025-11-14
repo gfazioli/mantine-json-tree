@@ -34,7 +34,9 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-number'
     | '--json-tree-color-boolean'
     | '--json-tree-color-null'
-    | '--json-tree-color-key';
+    | '--json-tree-color-key'
+    | '--json-tree-font-size'
+    | '--json-tree-color-bracket';
   header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
 };
 

@@ -4,6 +4,7 @@ import type { StylesApiData } from '../components/styles-api.types';
 export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
   selectors: {
     root: 'Root element',
+    header: 'Header element',
   },
 
   vars: {

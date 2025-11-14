@@ -1,14 +1,15 @@
+import '@mantine/core/styles.css';
+
 import '@gfazioli/mantine-json-tree/styles.css';
 import '@mantine/code-highlight/styles.css';
-import '@mantine/core/styles.css';
 import '@mantinex/demo/styles.css';
 import '@mantinex/mantine-header/styles.css';
 import '@mantinex/mantine-logo/styles.css';
 
-import { AppProps } from 'next/app';
-import Head from 'next/head';
 import { CodeHighlightAdapterProvider, createShikiAdapter } from '@mantine/code-highlight';
 import { MantineProvider } from '@mantine/core';
+import { AppProps } from 'next/app';
+import Head from 'next/head';
 import favicon from '../assets/favicon.svg';
 import { Footer } from '../components/Footer';
 import { theme } from '../theme';

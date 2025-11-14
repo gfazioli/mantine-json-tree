@@ -55,9 +55,9 @@ export const ecosystem = [
     newWindow: true,
   },
   {
-    key: 'mantine-json-tree',
-    title: 'Mantine JsonTree',
-    href: 'https://gfazioli.github.io/mantine-json-tree',
+    key: 'mantine-spinner',
+    title: 'Mantine Spinner',
+    href: 'https://gfazioli.github.io/mantine-spinner',
     newWindow: true,
   },
   {

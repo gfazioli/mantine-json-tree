@@ -1,7 +1,7 @@
 import { JsonTree } from '@gfazioli/mantine-json-tree';
 import { MantineDemo } from '@mantinex/demo';
 import { data, dataCode } from './data';
-import classes from './JsonTree.module.css';
+import classes from './JsonTreeSyntax.module.css';
 
 function Demo() {
   return (
@@ -28,7 +28,7 @@ const moduleCss = `
 }
 `;
 
-export const styled: MantineDemo = {
+export const syntax: MantineDemo = {
   type: 'code',
   component: Demo,
   defaultExpanded: false,

@@ -1,101 +1,42 @@
 import { JsonTree, JsonTreeProps } from '@gfazioli/mantine-json-tree';
-import { Center } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
+import { data, dataCode } from './data';
 
 function Demo(props: JsonTreeProps) {
-  return (
-    <Center h={400}>
-      <JsonTree {...props} />
-    </Center>
-  );
+  return <JsonTree {...props} data={data} />;
 }
 
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
+import { data } from './data';
 
 function Demo() {
-  return <JsonTree{{props}} />;
+  return <JsonTree{{props}} data={data}/>;
 }
 `;
 
 export const configurator: MantineDemo = {
   type: 'configurator',
   component: Demo,
-  code,
-  maxWidth: 290,
-  centered: true,
+  code: [
+    { fileName: 'Demo.tsx', code, language: 'tsx' },
+    { fileName: 'data.ts', code: dataCode, language: 'tsx' },
+  ],
   controls: [
+    { type: 'string', prop: 'title', initialValue: undefined as any, libraryValue: null },
+    { type: 'boolean', prop: 'defaultExpanded', initialValue: true, libraryValue: false },
     {
       type: 'number',
-      prop: 'size',
-      min: 16,
-      max: 200,
-      step: 1,
-      initialValue: 140,
-      libraryValue: 140,
-    },
-    {
-      type: 'number',
-      prop: 'inner',
+      prop: 'maxDepth',
+      initialValue: 2,
+      libraryValue: 2,
       min: 0,
-      max: 100,
+      max: 10,
       step: 1,
-      initialValue: 44,
-      libraryValue: 44,
     },
-    {
-      type: 'number',
-      prop: 'segments',
-      min: 8,
-      max: 64,
-      step: 1,
-      initialValue: 22,
-      libraryValue: 22,
-    },
-    {
-      type: 'number',
-      prop: 'thickness',
-      min: 1,
-      max: 32,
-      step: 1,
-      initialValue: 4,
-      libraryValue: 4,
-    },
-    {
-      type: 'number',
-      prop: 'speed',
-      min: 400,
-      max: 8400,
-      step: 1,
-      initialValue: 1200,
-      libraryValue: 1200,
-    },
-    {
-      type: 'segmented',
-      prop: 'strokeLinecap',
-      data: [
-        { label: 'Round', value: 'round' },
-        { label: 'Square', value: 'square' },
-        { label: 'Butt', value: 'butt' },
-      ],
-      initialValue: 'round',
-      libraryValue: 'round',
-    },
-    {
-      type: 'segmented',
-      prop: 'direction',
-      data: [
-        { label: 'Clockwise', value: 'clockwise' },
-        { label: 'Counter clockwise', value: 'counter-clockwise' },
-      ],
-      initialValue: 'clockwise',
-      libraryValue: 'clockwise',
-    },
-    {
-      type: 'color',
-      prop: 'color',
-      initialValue: '',
-      libraryValue: '',
-    },
+    { type: 'boolean', prop: 'withExpandAll', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'showItemsCount', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'withCopyToClipboard', initialValue: false, libraryValue: false },
+    { type: 'size', prop: 'size', initialValue: 'xs', libraryValue: 'xs' },
   ],
 };
