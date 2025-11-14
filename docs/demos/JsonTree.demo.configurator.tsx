@@ -3,7 +3,7 @@ import { MantineDemo } from '@mantinex/demo';
 import { data, dataCode } from './data';
 
 function Demo(props: JsonTreeProps) {
-  return <JsonTree {...props} data={data} />;
+  return <JsonTree {...props} data={data} maxDepth={1} defaultExpanded />;
 }
 
 const code = `
@@ -11,7 +11,7 @@ import { JsonTree } from "@gfazioli/mantine-json-tree";
 import { data } from './data';
 
 function Demo() {
-  return <JsonTree{{props}} data={data}/>;
+  return <JsonTree{{props}} data={data} maxDepth={1} defaultExpanded/>;
 }
 `;
 
