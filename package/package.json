@@ -1,6 +1,6 @@
 {
   "name": "@gfazioli/mantine-json-tree",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "A Mantine extension component that renders interactive JSON trees with syntax highlighting, collapsible nodes, copy-to-clipboard, and configurable expansion depth.",
   "homepage": "https://gfazioli.github.io/mantine-json-tree/",
   "packageManager": "yarn@4.0.1",
