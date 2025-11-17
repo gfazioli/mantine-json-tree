@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
-import { IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
+import { IconChevronDown, IconCopy, IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
 import {
   ActionIcon,
+  Badge,
   Box,
+  Code,
   createVarsResolver,
   Factory,
   factory,
@@ -12,37 +14,54 @@ import {
   MantineSize,
   rem,
   StylesApiProps,
+  Text,
   Tree,
   useMantineTheme,
   useProps,
   useStyles,
   useTree,
   type BoxProps,
+  type MantineTheme,
+  type RenderTreeNodePayload,
 } from '@mantine/core';
-import { renderJSONNode } from './lib/render';
-import { convertToTreeData, isExpandable, type JSONTreeNodeData } from './lib/utils';
+import {
+  convertToTreeData,
+  formatValue,
+  isExpandable,
+  type JSONTreeNodeData,
+  type ValueType,
+} from './lib/utils';
 import classes from './JsonTree.module.css';
 
 export type JsonTreeDirection = 'clockwise' | 'counter-clockwise';
 
-export type JsonTreeStylesNames = 'root' | 'header';
+export type JsonTreeStylesNames =
+  | 'root'
+  | 'header'
+  | 'key'
+  | 'value'
+  | 'bracket'
+  | 'indentGuide'
+  | 'copyButton';
 
 export type JsonTreeCssVariables = {
-  root:
-    | '--json-tree-font-family'
+  root: '--json-tree-font-family' | '--json-tree-font-size';
+  header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
+  key: '--json-tree-color-key';
+  value:
+    | '--json-tree-value-font-family'
     | '--json-tree-color-string'
     | '--json-tree-color-number'
     | '--json-tree-color-boolean'
-    | '--json-tree-color-null'
-    | '--json-tree-color-key'
-    | '--json-tree-font-size'
-    | '--json-tree-color-bracket'
+    | '--json-tree-color-null';
+  bracket: '--json-tree-color-bracket';
+  indentGuide:
     | '--json-tree-indent-guide-color-0'
     | '--json-tree-indent-guide-color-1'
     | '--json-tree-indent-guide-color-2'
     | '--json-tree-indent-guide-color-3'
     | '--json-tree-indent-guide-color-4';
-  header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
+  copyButton: never;
 };
 
 export interface JsonTreeBaseProps {
@@ -113,23 +132,31 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
     return {
       root: {
         '--json-tree-font-family': 'var(--mantine-font-family-monospace)',
+        '--json-tree-font-size': getFontSize(size) || 'var(--mantine-font-size-xs)',
+      },
+      header: {
+        '--json-tree-header-background-color': 'inherit',
+        '--json-tree-header-sticky-offset': stickyHeader ? rem(stickyHeaderOffset) : undefined,
+      },
+      key: {
+        '--json-tree-color-key': 'var(--mantine-color-blue-5)',
+      },
+      value: {
+        '--json-tree-value-font-family': 'var(--mantine-font-family-monospace)',
         '--json-tree-color-string': 'var(--mantine-color-green-7)',
         '--json-tree-color-number': 'var(--mantine-color-violet-7)',
         '--json-tree-color-boolean': 'var(--mantine-color-orange-7)',
         '--json-tree-color-null': 'var(--mantine-color-gray-6)',
-        '--json-tree-color-key': 'var(--mantine-color-blue-5)',
-        '--json-tree-font-size': getFontSize(size) || 'var(--mantine-font-size-xs)',
-        '--json-tree-color-bracket': 'var(--mantine-color-gray-5)',
+      },
+      bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
+      indentGuide: {
         '--json-tree-indent-guide-color-0': 'var(--mantine-color-blue-4)',
         '--json-tree-indent-guide-color-1': 'var(--mantine-color-lime-4)',
         '--json-tree-indent-guide-color-2': 'var(--mantine-color-violet-4)',
         '--json-tree-indent-guide-color-3': 'var(--mantine-color-green-4)',
         '--json-tree-indent-guide-color-4': 'var(--mantine-color-lime-4)',
       },
-      header: {
-        '--json-tree-header-background-color': 'inherit',
-        '--json-tree-header-sticky-offset': stickyHeader ? rem(stickyHeaderOffset) : undefined,
-      },
+      copyButton: {},
     };
   }
 );
@@ -207,6 +234,189 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   const tree = useTree({
     initialExpandedState,
   });
+
+  function renderJSONNode(
+    { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
+    _: MantineTheme,
+    props: JsonTreeProps,
+    onNodeClick?: (path: string, value: any) => void
+  ) {
+    const jsonNode = node as JSONTreeNodeData;
+
+    const {
+      type,
+      value,
+      key,
+      path,
+      itemCount,
+      depth = 0,
+    } = jsonNode.nodeData || {
+      type: 'null' as ValueType,
+      value: null,
+      path: 'unknown',
+      depth: 0,
+    };
+
+    const { showItemsCount, withCopyToClipboard, onCopy, showIndentGuides } = props;
+
+    const handleCopy = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        const copy = JSON.stringify(value, null, 2);
+        await navigator.clipboard.writeText(copy);
+        onCopy?.(copy, value);
+      } catch (error) {
+        // =jon= future use: Handle copy error if needed
+      }
+    };
+
+    const handleClick = () => {
+      if (onNodeClick) {
+        onNodeClick(path, value);
+      }
+    };
+
+    // Render indent guides (vertical lines)
+    const renderIndentGuides = () => {
+      if (!showIndentGuides || depth === 0) {
+        return null;
+      }
+
+      const guides = [];
+      for (let i = 0; i < depth; i++) {
+        const colorIndex = i % 5;
+        guides.push(
+          <div
+            key={i}
+            {...getStyles('indentGuide')}
+            data-color-index={colorIndex}
+            style={{
+              left: `${i * 32 + 8}px`,
+            }}
+          />
+        );
+      }
+      return guides;
+    };
+
+    // Render primitive value
+    if (!hasChildren) {
+      return (
+        <Group
+          gap={4}
+          wrap="nowrap"
+          {...elementProps}
+          onClick={handleClick}
+          style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+        >
+          {renderIndentGuides()}
+          {key !== undefined && (
+            <>
+              <Text component="span" {...getStyles('key')}>
+                {key}
+              </Text>
+              <Text component="span" c="dimmed">
+                :
+              </Text>
+            </>
+          )}
+          <Code {...getStyles('value')} data-type={type}>
+            {formatValue(value, type)}
+          </Code>
+
+          {withCopyToClipboard && (
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color="gray"
+              onClick={handleCopy}
+              {...getStyles('copyButton')}
+            >
+              <IconCopy size={12} />
+            </ActionIcon>
+          )}
+        </Group>
+      );
+    }
+
+    // Render expandable object/array
+    const openBracket = type === 'array' ? '[' : '{';
+    const closeBracket = type === 'array' ? ']' : '}';
+
+    return (
+      <Group
+        gap={4}
+        wrap="nowrap"
+        {...elementProps}
+        onClick={handleClick}
+        data-expanded={expanded}
+        data-has-children={hasChildren}
+        data-type={type}
+        style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+      >
+        {renderIndentGuides()}
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          onClick={(e) => {
+            e.stopPropagation();
+            tree.toggleExpanded(node.value);
+          }}
+        >
+          <IconChevronDown
+            size={14}
+            style={{
+              transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        </ActionIcon>
+
+        {key !== undefined && (
+          <>
+            <Text component="span" {...getStyles('key')}>
+              {key}
+            </Text>
+            <Text component="span" c="dimmed">
+              :
+            </Text>
+          </>
+        )}
+
+        <Text component="span" {...getStyles('bracket')}>
+          {openBracket}
+        </Text>
+
+        {!expanded && (
+          <>
+            <Text component="span" c="dimmed" size="xs">
+              ...
+            </Text>
+            <Text component="span" {...getStyles('bracket')}>
+              {closeBracket}
+            </Text>
+            {itemCount !== undefined && showItemsCount && (
+              <Badge size="xs" variant="light" color="gray">
+                {itemCount}
+              </Badge>
+            )}
+          </>
+        )}
+
+        {withCopyToClipboard && (
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            color="gray"
+            onClick={handleCopy}
+            {...getStyles('copyButton')}
+          >
+            <IconCopy size={12} />
+          </ActionIcon>
+        )}
+      </Group>
+    );
+  }
 
   return (
     <Box ref={ref} {...getStyles('root')} {...others}>

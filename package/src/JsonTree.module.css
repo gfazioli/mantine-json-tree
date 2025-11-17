@@ -10,7 +10,7 @@
 }
 
 .value {
-  font-family: var(--json-tree-font-family);
+  font-family: var(--json-tree-value-font-family, var(--json-tree-font-family));
   padding: 2px 6px;
   border-radius: var(--mantine-radius-sm);
   background-color: transparent;

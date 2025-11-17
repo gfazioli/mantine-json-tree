@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollArea, Stack, Title } from '@mantine/core';
 import { JsonTree } from './JsonTree';
-import classes from './IndentGuide.module.css';
+import classes from './Classes.module.css';
 
 export default {
   title: 'JsonTree',
@@ -126,16 +126,40 @@ export function IndentGuide() {
   );
 }
 
-export function IndentGuideStyled() {
+export function ClassesStyled() {
   return (
     <Stack>
       <JsonTree
         classNames={classes}
-        styles={{
-          root: {
-            '--json-tree-color-string': 'red',
-          },
-        }}
+        data={data}
+        title="contact.json"
+        withExpandAll
+        defaultExpanded
+        stickyHeader
+        showIndentGuides
+      />
+    </Stack>
+  );
+}
+
+export function StyleStyled() {
+  return (
+    <Stack>
+      <JsonTree
+        data={data}
+        title="contact.json"
+        withExpandAll
+        defaultExpanded
+        stickyHeader
+        showIndentGuides
+      />
+    </Stack>
+  );
+}
+export function StylesStyled() {
+  return (
+    <Stack>
+      <JsonTree
         data={data}
         title="contact.json"
         withExpandAll
