@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { IconChevronDown, IconCopy, IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
+import { IconChevronRight, IconCopy, IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
 import {
   ActionIcon,
   Badge,
@@ -38,9 +38,14 @@ export type JsonTreeDirection = 'clockwise' | 'counter-clockwise';
 export type JsonTreeStylesNames =
   | 'root'
   | 'header'
+  | 'controls'
+  | 'expandCollapse'
   | 'key'
+  | 'keyValueSeparator'
   | 'value'
   | 'bracket'
+  | 'ellipsis'
+  | 'itemsCount'
   | 'indentGuide'
   | 'copyButton';
 
@@ -49,7 +54,6 @@ export type JsonTreeCssVariables = {
   header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
   key: '--json-tree-color-key';
   value:
-    | '--json-tree-value-font-family'
     | '--json-tree-color-string'
     | '--json-tree-color-number'
     | '--json-tree-color-boolean'
@@ -61,6 +65,11 @@ export type JsonTreeCssVariables = {
     | '--json-tree-indent-guide-color-2'
     | '--json-tree-indent-guide-color-3'
     | '--json-tree-indent-guide-color-4';
+  expandCollapse: never;
+  ellipsis: never;
+  itemsCount: never;
+  controls: never;
+  keyValueSeparator: never;
   copyButton: never;
 };
 
@@ -103,6 +112,21 @@ export interface JsonTreeBaseProps {
 
   /** Offset for the sticky header (e.g. to account for a fixed navbar) @default 0*/
   stickyHeaderOffset?: number | string;
+
+  /** Icon for expand button */
+  expandControlIcon?: React.ReactNode;
+
+  /** Icon for collapse button */
+  collapseControlIcon?: React.ReactNode;
+
+  /** Icon for expand all control */
+  expandAllControlIcon?: React.ReactNode;
+
+  /** Icon for collapse all control */
+  collapseAllControlIcon?: React.ReactNode;
+
+  /** Icon for copy to clipboard button */
+  copyToClipboardIcon?: React.ReactNode;
 }
 
 export interface JsonTreeProps
@@ -125,6 +149,9 @@ export const defaultProps: Partial<JsonTreeProps> = {
   withCopyToClipboard: false,
   showIndentGuides: false,
   stickyHeader: false,
+  expandAllControlIcon: <IconLibraryPlus size={16} />,
+  collapseAllControlIcon: <IconLibraryMinus size={16} />,
+  copyToClipboardIcon: <IconCopy size={12} />,
 };
 
 const varsResolver = createVarsResolver<JsonTreeFactory>(
@@ -142,7 +169,6 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-key': 'var(--mantine-color-blue-5)',
       },
       value: {
-        '--json-tree-value-font-family': 'var(--mantine-font-family-monospace)',
         '--json-tree-color-string': 'var(--mantine-color-green-7)',
         '--json-tree-color-number': 'var(--mantine-color-violet-7)',
         '--json-tree-color-boolean': 'var(--mantine-color-orange-7)',
@@ -156,6 +182,11 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-indent-guide-color-3': 'var(--mantine-color-green-4)',
         '--json-tree-indent-guide-color-4': 'var(--mantine-color-lime-4)',
       },
+      expandCollapse: {},
+      keyValueSeparator: {},
+      ellipsis: {},
+      itemsCount: {},
+      controls: {},
       copyButton: {},
     };
   }
@@ -178,6 +209,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     showIndentGuides,
     stickyHeaderOffset,
     stickyHeader,
+    expandAllControlIcon,
+    collapseAllControlIcon,
+    copyToClipboardIcon,
+    expandControlIcon,
+    collapseControlIcon,
 
     classNames,
     style,
@@ -288,11 +324,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
         guides.push(
           <div
             key={i}
-            {...getStyles('indentGuide')}
+            {...getStyles('indentGuide', {
+              style: {
+                left: `${i * 32 + 8}px`,
+              },
+            })}
             data-color-index={colorIndex}
-            style={{
-              left: `${i * 32 + 8}px`,
-            }}
           />
         );
       }
@@ -312,15 +349,15 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
           {renderIndentGuides()}
           {key !== undefined && (
             <>
-              <Text component="span" {...getStyles('key')}>
+              <Text component="span" {...getStyles('key')} data-key={key}>
                 {key}
               </Text>
-              <Text component="span" c="dimmed">
+              <Text component="span" {...getStyles('keyValueSeparator')}>
                 :
               </Text>
             </>
           )}
-          <Code {...getStyles('value')} data-type={type}>
+          <Code {...getStyles('value')} data-type={type} data-value={formatValue(value, type)}>
             {formatValue(value, type)}
           </Code>
 
@@ -332,7 +369,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
               onClick={handleCopy}
               {...getStyles('copyButton')}
             >
-              <IconCopy size={12} />
+              {copyToClipboardIcon}
             </ActionIcon>
           )}
         </Group>
@@ -342,6 +379,34 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     // Render expandable object/array
     const openBracket = type === 'array' ? '[' : '{';
     const closeBracket = type === 'array' ? ']' : '}';
+
+    const expandCollapseIcon = (() => {
+      if (!expandControlIcon && !collapseControlIcon) {
+        return (
+          <IconChevronRight
+            size={14}
+            style={{
+              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        );
+      }
+
+      if (expandControlIcon && !collapseControlIcon) {
+        return React.cloneElement(expandControlIcon as React.ReactElement<any>, {
+          style: {
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          },
+        });
+      }
+
+      if (!expandControlIcon && collapseControlIcon) {
+        return expanded ? collapseControlIcon : <IconChevronRight size={14} />;
+      }
+      return expanded ? collapseControlIcon : expandControlIcon;
+    })();
 
     return (
       <Group
@@ -362,14 +427,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
             e.stopPropagation();
             tree.toggleExpanded(node.value);
           }}
+          {...getStyles('expandCollapse')}
         >
-          <IconChevronDown
-            size={14}
-            style={{
-              transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
-              transition: 'transform 0.2s ease',
-            }}
-          />
+          {expandCollapseIcon}
         </ActionIcon>
 
         {key !== undefined && (
@@ -377,7 +437,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
             <Text component="span" {...getStyles('key')}>
               {key}
             </Text>
-            <Text component="span" c="dimmed">
+            <Text component="span" {...getStyles('keyValueSeparator')}>
               :
             </Text>
           </>
@@ -389,14 +449,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
 
         {!expanded && (
           <>
-            <Text component="span" c="dimmed" size="xs">
+            <Text component="span" size="xs" {...getStyles('ellipsis')}>
               ...
             </Text>
             <Text component="span" {...getStyles('bracket')}>
               {closeBracket}
             </Text>
             {itemCount !== undefined && showItemsCount && (
-              <Badge size="xs" variant="light" color="gray">
+              <Badge size="xs" variant="light" color="gray" {...getStyles('itemsCount')}>
                 {itemCount}
               </Badge>
             )}
@@ -411,7 +471,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
             onClick={handleCopy}
             {...getStyles('copyButton')}
           >
-            <IconCopy size={12} />
+            {copyToClipboardIcon}
           </ActionIcon>
         )}
       </Group>
@@ -424,13 +484,23 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
         <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
           {title || <div />}
           {withExpandAll && isExpandable(data) && (
-            <Group gap="xs" style={{ top: 10, zIndex: 1, borderRadius: '8px' }}>
-              <ActionIcon size="xs" variant="transparent" onClick={() => tree.expandAllNodes()}>
-                <IconLibraryPlus size={16} />
+            <Group gap="xs" style={{ top: 10, zIndex: 1 }}>
+              <ActionIcon
+                size="xs"
+                variant="transparent"
+                onClick={() => tree.expandAllNodes()}
+                {...getStyles('controls')}
+              >
+                {expandAllControlIcon}
               </ActionIcon>
 
-              <ActionIcon size="xs" variant="transparent" onClick={() => tree.collapseAllNodes()}>
-                <IconLibraryMinus size={16} />
+              <ActionIcon
+                size="xs"
+                variant="transparent"
+                onClick={() => tree.collapseAllNodes()}
+                {...getStyles('controls')}
+              >
+                {collapseAllControlIcon}
               </ActionIcon>
             </Group>
           )}

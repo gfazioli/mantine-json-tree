@@ -38,4 +38,5 @@ export const indentGuides: MantineDemo = {
     { fileName: 'Demo.tsx', code, language: 'tsx' },
     { fileName: 'data.ts', code: dataCode, language: 'tsx' },
   ],
+  defaultExpanded: false,
 };

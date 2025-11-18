@@ -17,6 +17,11 @@
   }
 }
 
+.ellipsis {
+  color: rgb(255, 0, 106);
+  font-size: 20px;
+}
+
 .bracket {
   font-weight: 800;
   font-size: 32px;

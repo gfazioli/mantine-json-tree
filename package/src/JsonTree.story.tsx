@@ -148,6 +148,11 @@ export function StyleStyled() {
       <JsonTree
         data={data}
         title="contact.json"
+        style={{
+          color: 'red',
+          '--json-tree-font-size': '28px',
+          '.mantine-JsonTree-key': { '--json-tree-color-key': 'purple', color: 'purple' },
+        }}
         withExpandAll
         defaultExpanded
         stickyHeader
@@ -156,7 +161,42 @@ export function StyleStyled() {
     </Stack>
   );
 }
+
 export function StylesStyled() {
+  return (
+    <Stack>
+      <JsonTree
+        data={data}
+        title="contact.json"
+        styles={{
+          root: { fontSize: 22 },
+          key: { color: 'purple' },
+        }}
+        withExpandAll
+        defaultExpanded
+        stickyHeader
+        showIndentGuides
+      />
+    </Stack>
+  );
+}
+
+export function Container() {
+  return (
+    <Stack p={16} bg="dark.9">
+      <JsonTree
+        data={data}
+        title="contact.json"
+        withExpandAll
+        defaultExpanded
+        stickyHeader
+        showIndentGuides
+      />
+    </Stack>
+  );
+}
+
+export function CustomCollapseIcon() {
   return (
     <Stack>
       <JsonTree
@@ -166,6 +206,24 @@ export function StylesStyled() {
         defaultExpanded
         stickyHeader
         showIndentGuides
+        expandControlIcon={<span style={{ color: 'green' }}>👉</span>}
+      />
+    </Stack>
+  );
+}
+
+export function CustomCollapseExpandIcon() {
+  return (
+    <Stack>
+      <JsonTree
+        data={data}
+        title="contact.json"
+        withExpandAll
+        defaultExpanded
+        stickyHeader
+        showIndentGuides
+        expandControlIcon={<span style={{ color: 'green' }}>⊕</span>}
+        collapseControlIcon={<span style={{ color: 'red' }}>⊖</span>}
       />
     </Stack>
   );

@@ -1,5 +1,15 @@
-.root {
-  --json-tree-indent-guide-color-0: red !important;
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(100, 149, 237, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(100, 149, 237, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(100, 149, 237, 0);
+  }
 }
 
 .header {
@@ -11,4 +21,21 @@
     background-color: var(--mantine-color-gray-0);
     border: 1px solid var(--mantine-color-gray-1);
   }
+}
+
+.value {
+  &[data-type='string'] {
+    border: 1px solid var(--mantine-primary-color-6);
+    animation: pulse 2s infinite;
+
+    &[data-value='"js"'] {
+      border: 1px solid var(--mantine-color-red-6);
+      animation: none;
+    }
+  }
+}
+
+.itemsCount {
+  background-color: var(--mantine-primary-color-6);
+  animation: pulse 2s infinite reverse;
 }

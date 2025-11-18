@@ -3,20 +3,6 @@ import { MantineDemo } from '@mantinex/demo';
 import { data, dataCode } from './data';
 import classes from './JsonTree.module.css';
 
-function Demo() {
-  return (
-    <JsonTree
-      classNames={classes}
-      title="demo.json"
-      showIndentGuides
-      defaultExpanded
-      maxDepth={1}
-      data={data}
-      style={{ '--json-tree-color-string': 'red' }}
-    />
-  );
-}
-
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
 import classes from './JsonTree.module.css';
@@ -29,17 +15,27 @@ function Demo() {
       title="demo.json"
       showIndentGuides
       defaultExpanded
+      showItemsCount
       maxDepth={1}
       data={data}
-      style={{ '--json-tree-color-string': 'red' }}
     />
   );
 }
 `;
 
 const moduleCss = `
-.root {
-  --json-tree-indent-guide-color-0: red !important;
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(100, 149, 237, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(100, 149, 237, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(100, 149, 237, 0);
+  }
 }
 
 .header {
@@ -52,7 +48,38 @@ const moduleCss = `
     border: 1px solid var(--mantine-color-gray-1);
   }
 }
+
+.value {
+  &[data-type='string'] {
+    border: 1px solid var(--mantine-primary-color-6);
+    animation: pulse 2s infinite;
+
+    &[data-value='"js"'] {
+      border: 1px solid var(--mantine-color-red-6);
+      animation: none;
+    }
+  }
+}
+
+.itemsCount {
+  background-color: var(--mantine-primary-color-6);
+  animation: pulse 2s infinite reverse;
+}
 `;
+
+function Demo() {
+  return (
+    <JsonTree
+      classNames={classes}
+      title="demo.json"
+      showIndentGuides
+      defaultExpanded
+      showItemsCount
+      maxDepth={1}
+      data={data}
+    />
+  );
+}
 
 export const styled: MantineDemo = {
   type: 'code',
