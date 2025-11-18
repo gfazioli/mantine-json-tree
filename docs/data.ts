@@ -27,7 +27,7 @@ export interface PackageData {
 export const PACKAGE_DATA: PackageData = {
   packageName: '@gfazioli/mantine-json-tree',
   packageDescription:
-    'A Mantine React component offers customizable loading animations to enhance the user experience in React applications.',
+    'A Mantine extension component that renders interactive JSON trees with syntax highlighting, collapsible nodes, copy-to-clipboard, and configurable expansion depth.',
   mdxFileUrl: 'https://github.com/gfazioli/mantine-json-tree/blob/master/docs/docs.mdx',
   repositoryUrl: 'https://github.com/gfazioli/mantine-json-tree',
   licenseUrl: 'https://github.com/gfazioli/mantine-json-tree/blob/master/LICENSE',
