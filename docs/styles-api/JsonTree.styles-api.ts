@@ -46,11 +46,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-indent-guide-color-3': 'Color for indent guide at level 3 (and every 5th level)',
       '--json-tree-indent-guide-color-4': 'Color for indent guide at level 4 (and every 5th level)',
     },
-    copyButton: {
-      '--json-tree-copy-button-color': 'Color for the copy button',
-      '--json-tree-copy-button-hover-background-color':
-        'Background color for the copy button on hover',
-    },
+    copyButton: {},
     expandCollapse: {},
     keyValueSeparator: {},
     ellipsis: {},
