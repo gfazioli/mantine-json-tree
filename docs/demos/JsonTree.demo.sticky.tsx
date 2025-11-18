@@ -3,25 +3,9 @@ import { ScrollArea } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
 import { data, dataCode } from './data';
 
-function Demo(props: JsonTreeProps) {
-  return (
-    <ScrollArea style={{ height: 300 }}>
-      <JsonTree
-        {...props}
-        data={data}
-        title="data.json"
-        defaultExpanded
-        withExpandAll
-        styles={{
-          header: { backgroundColor: 'var(--mantine-color-default)' },
-        }}
-      />
-    </ScrollArea>
-  );
-}
-
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
+import { ScrollArea } from '@mantine/core';
 import { data } from './data';
 
 function Demo() {
@@ -40,6 +24,23 @@ function Demo() {
   );
 }
 `;
+
+function Demo(props: JsonTreeProps) {
+  return (
+    <ScrollArea style={{ height: 300 }}>
+      <JsonTree
+        {...props}
+        data={data}
+        title="data.json"
+        defaultExpanded
+        withExpandAll
+        styles={{
+          header: { backgroundColor: 'var(--mantine-color-default)' },
+        }}
+      />
+    </ScrollArea>
+  );
+}
 
 export const sticky: MantineDemo = {
   type: 'configurator',
