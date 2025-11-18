@@ -5,7 +5,7 @@ import { data, dataCode } from './data';
 
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
-import classes from './JsonTree.module.css';
+import { Paper, SimpleGrid, Text, Title } from '@mantine/core';
 import { data } from './data';
 
 function Demo() {
