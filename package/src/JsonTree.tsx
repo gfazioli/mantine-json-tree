@@ -401,6 +401,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
       if (expandControlIcon && !collapseControlIcon) {
         return React.cloneElement(expandControlIcon as React.ReactElement<any>, {
           style: {
+            ...(expandControlIcon as React.ReactElement<any>).props?.style,
             transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s ease',
           },
