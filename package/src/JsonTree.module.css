@@ -3,6 +3,22 @@
   font-size: var(--json-tree-font-size);
 }
 
+.header {
+  background-color: var(--json-tree-header-background-color, inherit);
+  padding: var(--mantine-spacing-xs);
+
+  &[data-sticky='true'] {
+    position: sticky;
+    top: var(--json-tree-header-sticky-offset, 0);
+    z-index: 3;
+  }
+}
+
+.keyValueSeparator {
+  font-size: inherit;
+  color: inherit;
+}
+
 .key {
   font-weight: 500;
   font-size: inherit;
@@ -35,23 +51,17 @@
   }
 }
 
-.header {
-  background-color: var(--json-tree-header-background-color, inherit);
-  padding: var(--mantine-spacing-xs);
-
-  &[data-sticky='true'] {
-    position: sticky;
-    top: var(--json-tree-header-sticky-offset, 0);
-    z-index: 3;
-  }
-}
-
 .bracket {
   font-weight: 700;
   font-size: inherit;
   font-family: var(--json-tree-font-family);
   color: var(--json-tree-color-bracket);
   user-select: none;
+}
+
+.ellipsis {
+  font-size: inherit;
+  color: var(--mantine-color-dark-3);
 }
 
 .copyButton {
