@@ -357,9 +357,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
               </Text>
             </>
           )}
-          <Code {...getStyles('value')} data-type={type} data-value={formatValue(value, type)}>
-            {formatValue(value, type)}
-          </Code>
+          {(() => {
+            const formattedValue = formatValue(value, type);
+            return (
+              <Code {...getStyles('value')} data-type={type} data-value={formattedValue}>
+                {formattedValue}
+              </Code>
+            );
+          })()}
 
           {withCopyToClipboard && (
             <ActionIcon
