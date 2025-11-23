@@ -35,6 +35,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-color-number': 'Color for number values',
       '--json-tree-color-boolean': 'Color for boolean values',
       '--json-tree-color-null': 'Color for null values',
+      '--json-tree-color-function': 'Color for function values',
     },
     bracket: {
       '--json-tree-color-bracket': 'Color for brackets and punctuation',

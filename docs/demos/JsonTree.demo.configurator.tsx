@@ -29,5 +29,16 @@ export const configurator: MantineDemo = {
     { type: 'boolean', prop: 'withCopyToClipboard', initialValue: false, libraryValue: false },
     { type: 'boolean', prop: 'showIndentGuides', initialValue: false, libraryValue: false },
     { type: 'boolean', prop: 'showItemsCount', initialValue: false, libraryValue: false },
+    {
+      type: 'select',
+      prop: 'displayFunctions',
+      initialValue: 'as-string',
+      libraryValue: 'as-string',
+      data: [
+        { value: 'as-string', label: 'as-string' },
+        { value: 'hide', label: 'hide' },
+        { value: 'as-object', label: 'as-object' },
+      ],
+    },
   ],
 };

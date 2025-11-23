@@ -49,6 +49,16 @@ You can customize the expand/collapse icons used in the `JsonTree` component by 
 
 <Demo data={demos.customIcons} />
 
+## Function Display
+
+By default, functions in JSON data are displayed as strings (e.g., `[Function: name]`). You can control how functions are handled using the `displayFunctions` prop:
+
+- `as-string` (default): Display functions as formatted strings showing their name
+- `hide`: Completely omit functions from the tree
+- `as-object`: Treat functions as objects and display their properties
+
+<Demo data={demos.functions} />
+
 ## Style the component with classNames
 
 You can style the `JsonTree` component using the `classNames` prop to target specific inner elements. This allows for granular customization of the component's appearance.

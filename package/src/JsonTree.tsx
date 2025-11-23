@@ -57,7 +57,8 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-string'
     | '--json-tree-color-number'
     | '--json-tree-color-boolean'
-    | '--json-tree-color-null';
+    | '--json-tree-color-null'
+    | '--json-tree-color-function';
   bracket: '--json-tree-color-bracket';
   indentGuide:
     | '--json-tree-indent-guide-color-0'
@@ -127,7 +128,13 @@ export interface JsonTreeBaseProps {
 
   /** Icon for copy to clipboard button */
   copyToClipboardIcon?: React.ReactNode;
+
+  /** How to display functions in the JSON data @default 'as-string' */
+  displayFunctions?: JsonTreeFunctionDisplay;
 }
+
+/** Display mode for functions in JSON data */
+export type JsonTreeFunctionDisplay = 'as-string' | 'hide' | 'as-object';
 
 export interface JsonTreeProps
   extends BoxProps,
@@ -149,6 +156,7 @@ export const defaultProps: Partial<JsonTreeProps> = {
   withCopyToClipboard: false,
   showIndentGuides: false,
   stickyHeader: false,
+  displayFunctions: 'as-string',
   expandAllControlIcon: <IconLibraryPlus size={16} />,
   collapseAllControlIcon: <IconLibraryMinus size={16} />,
   copyToClipboardIcon: <IconCopy size={12} />,
@@ -173,6 +181,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-number': 'var(--mantine-color-violet-7)',
         '--json-tree-color-boolean': 'var(--mantine-color-orange-7)',
         '--json-tree-color-null': 'var(--mantine-color-gray-6)',
+        '--json-tree-color-function': 'var(--mantine-color-cyan-7)',
       },
       bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
       indentGuide: {
@@ -209,6 +218,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     showIndentGuides,
     stickyHeaderOffset,
     stickyHeader,
+    displayFunctions,
     expandAllControlIcon,
     collapseAllControlIcon,
     copyToClipboardIcon,
@@ -241,7 +251,10 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   const theme = useMantineTheme();
 
   // Convert JSON data to Mantine Tree format
-  const treeData = useMemo(() => [convertToTreeData(data)], [data]);
+  const treeData = useMemo(
+    () => [convertToTreeData(data, undefined, 'root', 0, displayFunctions)],
+    [data, displayFunctions]
+  );
 
   // Calculate initial expanded state based on maxDepth
   const initialExpandedState = useMemo(() => {

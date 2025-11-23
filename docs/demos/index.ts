@@ -1,5 +1,6 @@
 export { configurator } from './JsonTree.demo.configurator';
 export { customIcons } from './JsonTree.demo.customIcons';
+export { functions } from './JsonTree.demo.functions';
 export { indentGuides } from './JsonTree.demo.indentGuides';
 export { sticky } from './JsonTree.demo.sticky';
 export { styled } from './JsonTree.demo.styled';
