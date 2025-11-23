@@ -1,4 +1,5 @@
 import { type TreeNodeData } from '@mantine/core';
+import type { JsonTreeFunctionDisplay } from '../JsonTree';
 
 export interface JSONTreeNodeData extends TreeNodeData {
   nodeData?: {
@@ -14,7 +15,15 @@ export interface JSONTreeNodeData extends TreeNodeData {
 /**
  * Type of a JSON value for rendering purposes.
  */
-export type ValueType = 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'undefined';
+export type ValueType =
+  | 'object'
+  | 'array'
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'null'
+  | 'undefined'
+  | 'function';
 
 /**
  * Get the type of a value for display purposes.
@@ -28,6 +37,9 @@ export function getValueType(value: any): ValueType {
   }
   if (Array.isArray(value)) {
     return 'array';
+  }
+  if (typeof value === 'function') {
+    return 'function';
   }
   return typeof value as ValueType;
 }
@@ -59,6 +71,10 @@ export function formatValue(value: any, type: ValueType): string {
   if (type === 'undefined') {
     return 'undefined';
   }
+  if (type === 'function') {
+    const name = value.name;
+    return name ? `[Function: ${name}]` : '[Function]';
+  }
   return String(value);
 }
 
@@ -82,9 +98,36 @@ export function convertToTreeData(
   value: any,
   key?: string,
   path: string = 'root',
-  depth: number = 0
+  depth: number = 0,
+  displayFunctions: JsonTreeFunctionDisplay = 'as-string'
 ): JSONTreeNodeData {
   const type = getValueType(value);
+
+  // Handle functions based on displayFunctions setting
+  if (type === 'function') {
+    if (displayFunctions === 'hide') {
+      // Return null to skip this node (will be filtered later)
+      return null as any;
+    }
+    if (displayFunctions === 'as-string') {
+      // Treat as primitive string value
+      return {
+        value: path,
+        label: key || 'root',
+        nodeData: { type, value, key, path, depth },
+      };
+    }
+    // displayFunctions === 'as-object': treat function as object to show its properties
+    const functionProps = Object.getOwnPropertyNames(value).reduce(
+      (acc, prop) => {
+        acc[prop] = value[prop];
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+    return convertToTreeData(functionProps, key, path, depth, displayFunctions);
+  }
+
   const expandable = isExpandable(value);
   const nodeValue = path;
 
@@ -101,7 +144,9 @@ export function convertToTreeData(
       ? value.map((item: any, index: number) => [String(index), item] as [string, any])
       : Object.entries(value);
 
-  const children = entries.map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`, depth + 1));
+  const children = entries
+    .map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`, depth + 1, displayFunctions))
+    .filter((node) => node !== null); // Filter out hidden functions
 
   return {
     value: nodeValue,

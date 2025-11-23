@@ -4,6 +4,10 @@ export const data = {
   isAdmin: false,
   courses: ['html', 'css', 'js'],
   wife: null,
+  onClick: function handleClick() {
+    // eslint-disable-next-line no-console
+    console.log('clicked');
+  },
   address: {
     street: '123 Main St',
     city: 'Anytown',
@@ -28,6 +32,9 @@ export const dataCode = `export const data = {
   isAdmin: false,
   courses: ['html', 'css', 'js'],
   wife: null,
+  onClick: function handleClick() {
+    console.log('clicked');
+  },
   address: {
     street: '123 Main St',
     city: 'Anytown',

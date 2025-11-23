@@ -228,3 +228,78 @@ export function CustomCollapseExpandIcon() {
     </Stack>
   );
 }
+
+const dataWithFunctions = {
+  name: 'Example',
+  onClick: function handleClick() {
+    // eslint-disable-next-line no-console
+    console.log('clicked');
+  },
+  calculate: (a: number, b: number) => a + b,
+  methods: {
+    async fetchData() {
+      return 'data';
+    },
+    process: function process(value: string) {
+      return value.toUpperCase();
+    },
+  },
+  data: [1, 2, 3],
+};
+
+export function DisplayFunctionsAsString() {
+  return (
+    <Stack>
+      <Title order={3}>displayFunctions: &quot;as-string&quot; (default)</Title>
+      <JsonTree
+        data={dataWithFunctions}
+        title="data.json"
+        defaultExpanded
+        displayFunctions="as-string"
+      />
+    </Stack>
+  );
+}
+
+export function DisplayFunctionsHide() {
+  return (
+    <Stack>
+      <Title order={3}>displayFunctions: &quot;hide&quot;</Title>
+      <JsonTree
+        data={dataWithFunctions}
+        title="data.json"
+        defaultExpanded
+        displayFunctions="hide"
+      />
+    </Stack>
+  );
+}
+
+export function DisplayFunctionsAsObject() {
+  return (
+    <Stack>
+      <Title order={3}>displayFunctions: &quot;as-object&quot;</Title>
+      <JsonTree
+        data={dataWithFunctions}
+        title="data.json"
+        defaultExpanded
+        displayFunctions="as-object"
+      />
+    </Stack>
+  );
+}
+
+export function DisplayFunctionsComparison() {
+  return (
+    <Stack>
+      <Title order={3}>as-string</Title>
+      <JsonTree data={dataWithFunctions} defaultExpanded displayFunctions="as-string" />
+
+      <Title order={3}>hide</Title>
+      <JsonTree data={dataWithFunctions} defaultExpanded displayFunctions="hide" />
+
+      <Title order={3}>as-object</Title>
+      <JsonTree data={dataWithFunctions} defaultExpanded displayFunctions="as-object" />
+    </Stack>
+  );
+}
