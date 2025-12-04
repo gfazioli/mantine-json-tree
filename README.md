@@ -1,6 +1,6 @@
 # Mantine Json Tree Component
 
-<img width="2752" height="1536" alt="Gemini_Generated_Image_sbzrrfsbzrrfsbzr" src="https://github.com/user-attachments/assets/1cd7c216-4b99-4110-8a9f-34f146573fa6" />
+<img width="2752" height="1536" alt="Mantine Json Tree" src="https://github.com/user-attachments/assets/26d79eca-a2e8-4d5c-a62f-6bf075573a16" />
 
 <div align="center">
   
@@ -61,13 +61,4 @@ function Demo() {
   
 [![Star History Chart](https://api.star-history.com/svg?repos=gfazioli/mantine-json-tree&type=Timeline)](https://www.star-history.com/#gfazioli/mantine-json-tree&Timeline)
 
----
-
-<div align="center">
-
 https://github.com/user-attachments/assets/ce2b1ba2-51f7-43d5-8477-6d8fee103fa3
-
-</div>
-
-
-</div>
