@@ -2,8 +2,6 @@
 
 <img width="2752" height="1536" alt="Gemini_Generated_Image_sbzrrfsbzrrfsbzr" src="https://github.com/user-attachments/assets/1cd7c216-4b99-4110-8a9f-34f146573fa6" />
 
----
-
 <div align="center">
   
   [![NPM version](https://img.shields.io/npm/v/%40gfazioli%2Fmantine-json-tree?style=for-the-badge)](https://www.npmjs.com/package/@gfazioli/mantine-json-tree)
