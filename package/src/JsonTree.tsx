@@ -137,9 +137,7 @@ export interface JsonTreeBaseProps {
 export type JsonTreeFunctionDisplay = 'as-string' | 'hide' | 'as-object';
 
 export interface JsonTreeProps
-  extends BoxProps,
-    JsonTreeBaseProps,
-    StylesApiProps<JsonTreeFactory> {}
+  extends BoxProps, JsonTreeBaseProps, StylesApiProps<JsonTreeFactory> {}
 
 export type JsonTreeFactory = Factory<{
   props: JsonTreeProps;
