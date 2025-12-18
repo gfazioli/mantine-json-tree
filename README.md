@@ -15,20 +15,13 @@
 
 This component is created on top of the [Mantine](https://mantine.dev/) library.
 
-[![Mantine UI Library](https://img.shields.io/badge/-MANTINE_UI_LIBRARY-blue?style=for-the-badge&labelColor=black&logo=mantine
-)](https://mantine.dev/)
+[Mantine JsonTree](https://gfazioli.github.io/mantine-json-tree) provides a structured, interactive view of heterogeneous data—strings, numbers, booleans, nulls, objects, arrays, and even functions—organized as a collapsible tree. Developers can control initial expansion, show visual indent guides, and customize expand/collapse controls with arbitrary React nodes (e.g., emojis or styled icons) to match their design system. For function values, the component offers flexible rendering modes: show the function signature as text, hide functions entirely, or inspect them as objects when needed. 
 
-An interactive JSON tree viewer component built with Mantine's Tree component. Features collapsible nodes, syntax highlighting with type-specific colors, copy-to-clipboard functionality, item count badges, configurable expansion depth, and smooth animations. Perfect for debugging API responses, exploring complex data structures, and developer tools.
+Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTree integrates cleanly into dashboards, developer tools, and documentation pages where readable, navigable data visualization is essential.
 
-[![Mantine Extensions](https://img.shields.io/badge/-Watch_the_Video-blue?style=for-the-badge&labelColor=black&logo=youtube
-)](https://www.youtube.com/playlist?list=PL85tTROKkZrWyqCcmNCdWajpx05-cTal4)
-[![Demo and Documentation](https://img.shields.io/badge/-Demo_%26_Documentation-blue?style=for-the-badge&labelColor=black&logo=typescript
-)](https://gfazioli.github.io/mantine-json-tree/)
-[![Mantine Extensions HUB](https://img.shields.io/badge/-Mantine_Extensions_Hub-blue?style=for-the-badge&labelColor=blue
-)](https://mantine-extensions.vercel.app/)
-
-
-👉 You can find more components on the [Mantine Extensions Hub](https://mantine-extensions.vercel.app/) library.
+> [!note]
+>
+> → [Demo and Documentation](https://gfazioli.github.io/mantine-json-tree/) → [Youtube Video](https://www.youtube.com/playlist?list=PL85tTROKkZrWyqCcmNCdWajpx05-cTal4) → [More Mantine Components](https://mantine-extensions.vercel.app/)
 
 ## Installation
 
@@ -56,9 +49,9 @@ function Demo() {
   return <JsonTree data={{ key: "value" }} />;
 }
 ```
+---
+https://github.com/user-attachments/assets/ce2b1ba2-51f7-43d5-8477-6d8fee103fa3
 
-<div align="center">
-  
+---
 [![Star History Chart](https://api.star-history.com/svg?repos=gfazioli/mantine-json-tree&type=Timeline)](https://www.star-history.com/#gfazioli/mantine-json-tree&Timeline)
 
-https://github.com/user-attachments/assets/ce2b1ba2-51f7-43d5-8477-6d8fee103fa3
