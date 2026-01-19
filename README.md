@@ -1,6 +1,6 @@
 # Mantine Json Tree Component
 
-<img width="2752" height="1536" alt="Mantine Json Tree" src="https://github.com/user-attachments/assets/26d79eca-a2e8-4d5c-a62f-6bf075573a16" />
+<img alt="Mantine Json Tree" src="https://github.com/gfazioli/mantine-json-tree/blob/master/logo.png" />
 
 <div align="center">
   
@@ -64,10 +64,10 @@ function Demo() {
 
 Your support helps me:
 
-- Keep the project actively maintained with timely bug fixes and security updates 	
-- Add new features, improve performance, and refine the developer experience 	
-- Expand test coverage and documentation for smoother adoption 	
-- Ensure long‑term sustainability without relying on ad hoc free time 	
+- Keep the project actively maintained with timely bug fixes and security updates	
+- Add new features, improve performance, and refine the developer experience	
+- Expand test coverage and documentation for smoother adoption	
+- Ensure long‑term sustainability without relying on ad hoc free time	
 - Prioritize community requests and roadmap items that matter most
 
 Open source thrives when those who benefit can give back—even a small monthly contribution makes a real difference. Sponsorships help cover maintenance time, infrastructure, and the countless invisible tasks that keep a project healthy.
