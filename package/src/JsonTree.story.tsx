@@ -38,7 +38,11 @@ export function Usage() {
     <Stack>
       <JsonTree
         data={{
-          migration: <Loader size="xs" />,
+          loader: <Loader size="xs" />,
+          simpleHtml: <div>Hello World</div>,
+          nested: {
+            button: <button type="button">Click me</button>,
+          },
         }}
       />
       <JsonTree data={data} />

@@ -56,7 +56,7 @@
   }
 
   &[data-type='react-element'] {
-    color: var(--mantine-color-pink-7);
+    color: var(--json-tree-color-react-element);
     font-style: italic;
   }
 }

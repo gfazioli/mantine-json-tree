@@ -58,7 +58,8 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-number'
     | '--json-tree-color-boolean'
     | '--json-tree-color-null'
-    | '--json-tree-color-function';
+    | '--json-tree-color-function'
+    | '--json-tree-color-react-element';
   bracket: '--json-tree-color-bracket';
   indentGuide:
     | '--json-tree-indent-guide-color-0'
@@ -180,6 +181,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-boolean': 'var(--mantine-color-orange-7)',
         '--json-tree-color-null': 'var(--mantine-color-gray-6)',
         '--json-tree-color-function': 'var(--mantine-color-cyan-7)',
+        '--json-tree-color-react-element': 'var(--mantine-color-pink-7)',
       },
       bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
       indentGuide: {
