@@ -1,7 +1,7 @@
-import { Loader, ScrollArea, Stack, Title } from '@mantine/core';
 import React from 'react';
-import classes from './Classes.module.css';
+import { Loader, ScrollArea, Stack, Title } from '@mantine/core';
 import { JsonTree } from './JsonTree';
+import classes from './Classes.module.css';
 
 export default {
   title: 'JsonTree',
