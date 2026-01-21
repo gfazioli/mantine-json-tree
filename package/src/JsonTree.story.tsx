@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollArea, Stack, Title } from '@mantine/core';
+import { Loader, ScrollArea, Stack, Title } from '@mantine/core';
 import { JsonTree } from './JsonTree';
 import classes from './Classes.module.css';
 
@@ -36,6 +36,11 @@ const data = {
 export function Usage() {
   return (
     <Stack>
+      <JsonTree
+        data={{
+          migration: <Loader size="xs" />,
+        }}
+      />
       <JsonTree data={data} />
       <JsonTree data="Simple String" />
       <JsonTree data />

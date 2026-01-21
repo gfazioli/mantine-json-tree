@@ -54,6 +54,11 @@
     color: var(--json-tree-color-function);
     font-style: italic;
   }
+
+  &[data-type='react-element'] {
+    color: var(--mantine-color-pink-7);
+    font-style: italic;
+  }
 }
 
 .bracket {
