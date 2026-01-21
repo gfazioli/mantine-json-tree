@@ -1,13 +1,17 @@
 import { JsonTree } from '@gfazioli/mantine-json-tree';
-import { Paper } from '@mantine/core';
+import { Loader, Paper } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
 
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
-import { Paper, Stack } from '@mantine/core';
+import { Loader, Paper } from '@mantine/core';
 
 function Demo() {
   const specialTypes = {
+    // React components
+    reactLoader: <Loader size="xs" />,
+    reactButton: <button type="button">Click me</button>,
+    htmlDiv: <div>Hello World</div>,
     // Date objects - displayed in ISO format
     createdAt: new Date('2024-01-15T10:30:00Z'),
     lastModified: new Date('2024-06-20T14:45:30Z'),
@@ -67,6 +71,11 @@ function Demo() {
 
 function Demo() {
   const specialTypes = {
+    // React components
+    reactLoader: <Loader size="xs" />,
+    reactButton: <button type="button">Click me</button>,
+    htmlDiv: <div>Hello World</div>,
+
     // Date objects - displayed in ISO format
     createdAt: new Date('2024-01-15T10:30:00Z'),
     lastModified: new Date('2024-06-20T14:45:30Z'),
