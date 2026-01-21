@@ -1,7 +1,7 @@
-import React from 'react';
 import { Loader, ScrollArea, Stack, Title } from '@mantine/core';
-import { JsonTree } from './JsonTree';
+import React from 'react';
 import classes from './Classes.module.css';
+import { JsonTree } from './JsonTree';
 
 export default {
   title: 'JsonTree',
@@ -44,6 +44,7 @@ export function Usage() {
             button: <button type="button">Click me</button>,
           },
         }}
+        defaultExpanded
       />
       <JsonTree data={data} />
       <JsonTree data="Simple String" />
@@ -309,6 +310,72 @@ export function DisplayFunctionsComparison() {
 
       <Title order={3}>as-object</Title>
       <JsonTree data={dataWithFunctions} defaultExpanded displayFunctions="as-object" />
+    </Stack>
+  );
+}
+
+export function SpecialValueTypes() {
+  const specialData = {
+    // React components
+    reactLoader: <Loader size="xs" />,
+    reactButton: <button type="button">Click me</button>,
+    reactDiv: <div>Hello World</div>,
+
+    // Date
+    createdAt: new Date('2024-01-15T10:30:00Z'),
+    updatedAt: new Date(),
+
+    // Special numbers
+    notANumber: NaN,
+    positiveInfinity: Infinity,
+    negativeInfinity: -Infinity,
+
+    // BigInt
+    bigInteger: BigInt('9007199254740991'),
+    anotherBigInt: BigInt(123456789012345),
+
+    // Symbol
+    uniqueKey: Symbol('unique'),
+    namedSymbol: Symbol.for('app.config'),
+
+    // RegExp
+    emailPattern: /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/g,
+    phonePattern: new RegExp('\\d{3}-\\d{3}-\\d{4}'),
+
+    // Map
+    userMap: new Map<string | number, any>([
+      ['user1', { name: 'Alice', age: 25 }],
+      ['user2', { name: 'Bob', age: 30 }],
+      [123, 'numeric key'],
+    ]),
+    emptyMap: new Map(),
+
+    // Set
+    uniqueNumbers: new Set([1, 2, 3, 4, 5]),
+    mixedSet: new Set(['apple', 42, true, null]),
+    emptySet: new Set(),
+
+    // Nested combinations
+    complex: {
+      timestamp: new Date('2024-12-25T00:00:00Z'),
+      tags: new Set(['javascript', 'typescript', 'react']),
+      metadata: new Map([
+        ['version', '1.0.0'],
+        ['author', 'Developer'],
+      ]),
+    },
+  };
+
+  return (
+    <Stack>
+      <Title order={3}>Special Value Types</Title>
+      <JsonTree
+        data={specialData}
+        title="special-values.json"
+        defaultExpanded
+        withExpandAll
+        showItemsCount
+      />
     </Stack>
   );
 }

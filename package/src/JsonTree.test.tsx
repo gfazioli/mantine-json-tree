@@ -79,4 +79,86 @@ describe('JsonTree', () => {
       expect(container.textContent).toContain('loader');
     });
   });
+
+  describe('Special value types', () => {
+    it('handles Date objects', () => {
+      const dataWithDate = {
+        createdAt: new Date('2024-01-15T10:30:00Z'),
+      };
+
+      const { container } = render(<JsonTree data={dataWithDate} defaultExpanded />);
+      expect(container.textContent).toContain('createdAt');
+      expect(container.textContent).toContain('2024-01-15');
+    });
+
+    it('handles NaN and Infinity', () => {
+      const dataWithSpecialNumbers = {
+        notANumber: NaN,
+        positiveInfinity: Infinity,
+        negativeInfinity: -Infinity,
+      };
+
+      const { container } = render(<JsonTree data={dataWithSpecialNumbers} defaultExpanded />);
+      expect(container.textContent).toContain('NaN');
+      expect(container.textContent).toContain('Infinity');
+    });
+
+    it('handles BigInt', () => {
+      const dataWithBigInt = {
+        bigNumber: BigInt('9007199254740991'),
+      };
+
+      const { container } = render(<JsonTree data={dataWithBigInt} defaultExpanded />);
+      expect(container.textContent).toContain('bigNumber');
+      expect(container.textContent).toContain('n');
+    });
+
+    it('handles Symbol', () => {
+      const dataWithSymbol = {
+        key: Symbol('test'),
+      };
+
+      const { container } = render(<JsonTree data={dataWithSymbol} defaultExpanded />);
+      expect(container.textContent).toContain('key');
+      expect(container.textContent).toContain('Symbol');
+    });
+
+    it('handles RegExp', () => {
+      const dataWithRegExp = {
+        pattern: /test/gi,
+      };
+
+      const { container } = render(<JsonTree data={dataWithRegExp} defaultExpanded />);
+      expect(container.textContent).toContain('pattern');
+      expect(container.textContent).toContain('/test/gi');
+    });
+
+    it('handles Map as expandable', () => {
+      const dataWithMap = {
+        userMap: new Map([
+          ['user1', 'Alice'],
+          ['user2', 'Bob'],
+        ]),
+      };
+
+      const { container } = render(<JsonTree data={dataWithMap} defaultExpanded />);
+      expect(container.textContent).toContain('userMap');
+      // Map should be expandable and show its entries
+      expect(container.textContent).toContain('Alice');
+      expect(container.textContent).toContain('Bob');
+    });
+
+    it('handles Set as expandable', () => {
+      const dataWithSet = {
+        tags: new Set(['javascript', 'typescript', 'react']),
+      };
+
+      const { container } = render(<JsonTree data={dataWithSet} defaultExpanded />);
+      expect(container.textContent).toContain('tags');
+      // Set should be expandable and show its values
+      expect(container.textContent).toContain('javascript');
+      expect(container.textContent).toContain('typescript');
+      expect(container.textContent).toContain('react');
+    });
+  });
 });

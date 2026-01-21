@@ -59,6 +59,35 @@
     color: var(--json-tree-color-react-element);
     font-style: italic;
   }
+
+  &[data-type='date'] {
+    color: var(--json-tree-color-date);
+  }
+
+  &[data-type='nan'],
+  &[data-type='infinity'] {
+    color: var(--json-tree-color-nan);
+    font-style: italic;
+  }
+
+  &[data-type='bigint'] {
+    color: var(--json-tree-color-bigint);
+  }
+
+  &[data-type='symbol'] {
+    color: var(--json-tree-color-symbol);
+    font-style: italic;
+  }
+
+  &[data-type='regexp'] {
+    color: var(--json-tree-color-regexp);
+  }
+
+  &[data-type='map'],
+  &[data-type='set'] {
+    color: var(--json-tree-color-map);
+    font-weight: 600;
+  }
 }
 
 .bracket {
