@@ -2,6 +2,7 @@ export { configurator } from './JsonTree.demo.configurator';
 export { customIcons } from './JsonTree.demo.customIcons';
 export { functions } from './JsonTree.demo.functions';
 export { indentGuides } from './JsonTree.demo.indentGuides';
+export { specialTypes } from './JsonTree.demo.specialTypes';
 export { sticky } from './JsonTree.demo.sticky';
 export { styled } from './JsonTree.demo.styled';
 export { stylesApi } from './JsonTree.demo.stylesApi';

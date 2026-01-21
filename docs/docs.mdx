@@ -29,6 +29,23 @@ Below is an example of syntax highlighting for different JSON value types: strin
 
 <Demo data={demos.values} />
 
+## Special Value Types
+
+`JsonTree` supports modern JavaScript types beyond standard JSON primitives. These include Date objects, special numeric values (NaN, Infinity), BigInt for large integers, Symbols, RegExp patterns, and ES6 collections like Map and Set. Each type is displayed with distinct syntax highlighting and formatting:
+
+- **Date**: Displayed in ISO 8601 format (e.g., `2024-01-15T10:30:00.000Z`)
+- **NaN / Infinity**: Special numeric values shown with their standard JavaScript representation
+- **BigInt**: Large integers displayed with the `n` suffix (e.g., `9007199254740991n`)
+- **Symbol**: Unique identifiers shown with their description (e.g., `Symbol(unique)`)
+- **RegExp**: Regular expressions displayed with their pattern and flags (e.g., `/pattern/gi`)
+- **Map**: Key-value collections that are expandable to show their entries
+- **Set**: Unique value collections that are expandable to show their elements
+- **React Elements**: React components displayed with their component name (e.g., `<Loader />`)
+
+All colors can be customized using CSS variables for each type.
+
+<Demo data={demos.specialTypes} />
+
 ## Indent Guides
 
 Display vertical lines to visualize nesting levels, similar to Visual Studio Code. The guides use 5 distinct colors that cycle for deeper nesting levels.
