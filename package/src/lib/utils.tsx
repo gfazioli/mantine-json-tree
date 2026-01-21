@@ -24,7 +24,15 @@ export type ValueType =
   | 'null'
   | 'undefined'
   | 'function'
-  | 'react-element';
+  | 'react-element'
+  | 'date'
+  | 'nan'
+  | 'infinity'
+  | 'bigint'
+  | 'symbol'
+  | 'regexp'
+  | 'map'
+  | 'set';
 
 /**
  * Check if a value is a React element.
@@ -49,8 +57,35 @@ export function getValueType(value: any): ValueType {
   if (value === undefined) {
     return 'undefined';
   }
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) {
+      return 'nan';
+    }
+    if (!Number.isFinite(value)) {
+      return 'infinity';
+    }
+    return 'number';
+  }
   if (isReactElement(value)) {
     return 'react-element';
+  }
+  if (value instanceof Date) {
+    return 'date';
+  }
+  if (value instanceof RegExp) {
+    return 'regexp';
+  }
+  if (value instanceof Map) {
+    return 'map';
+  }
+  if (value instanceof Set) {
+    return 'set';
+  }
+  if (typeof value === 'bigint') {
+    return 'bigint';
+  }
+  if (typeof value === 'symbol') {
+    return 'symbol';
   }
   if (Array.isArray(value)) {
     return 'array';
@@ -72,6 +107,12 @@ export function isExpandable(value: any): boolean {
   if (type === 'array') {
     return value.length > 0;
   }
+  if (type === 'map') {
+    return value.size > 0;
+  }
+  if (type === 'set') {
+    return value.size > 0;
+  }
   return false;
 }
 
@@ -88,6 +129,12 @@ export function formatValue(value: any, type: ValueType): string {
   if (type === 'undefined') {
     return 'undefined';
   }
+  if (type === 'nan') {
+    return 'NaN';
+  }
+  if (type === 'infinity') {
+    return value > 0 ? 'Infinity' : '-Infinity';
+  }
   if (type === 'function') {
     const name = value.name;
     return name ? `[Function: ${name}]` : '[Function]';
@@ -95,6 +142,24 @@ export function formatValue(value: any, type: ValueType): string {
   if (type === 'react-element') {
     const componentName = value.type?.displayName || value.type?.name || value.type;
     return `<${typeof componentName === 'string' ? componentName : 'Component'} />`;
+  }
+  if (type === 'date') {
+    return value.toISOString();
+  }
+  if (type === 'bigint') {
+    return `${value}n`;
+  }
+  if (type === 'symbol') {
+    return value.toString();
+  }
+  if (type === 'regexp') {
+    return value.toString();
+  }
+  if (type === 'map') {
+    return `Map(${value.size})`;
+  }
+  if (type === 'set') {
+    return `Set(${value.size})`;
   }
   return String(value);
 }
@@ -106,10 +171,13 @@ export function getItemCount(value: any): number {
   if (Array.isArray(value)) {
     return value.length;
   }
+  if (value instanceof Map || value instanceof Set) {
+    return value.size;
+  }
   if (typeof value === 'object' && value !== null) {
     return Object.keys(value).length;
-    return 0;
   }
+  return 0;
 }
 
 /**
@@ -126,6 +194,22 @@ export function convertToTreeData(
 
   // Handle React elements as primitive values to avoid circular reference issues
   if (type === 'react-element') {
+    return {
+      value: path,
+      label: key || 'root',
+      nodeData: { type, value, key, path, depth },
+    };
+  }
+
+  // Handle Date, BigInt, Symbol, RegExp, NaN, Infinity as primitive values
+  if (
+    type === 'date' ||
+    type === 'bigint' ||
+    type === 'symbol' ||
+    type === 'regexp' ||
+    type === 'nan' ||
+    type === 'infinity'
+  ) {
     return {
       value: path,
       label: key || 'root',
@@ -169,10 +253,20 @@ export function convertToTreeData(
     };
   }
 
-  const entries: [string, any][] =
-    type === 'array'
-      ? value.map((item: any, index: number) => [String(index), item] as [string, any])
-      : Object.entries(value);
+  let entries: [string, any][] = [];
+  if (type === 'array') {
+    entries = value.map((item: any, index: number) => [String(index), item] as [string, any]);
+  } else if (type === 'map') {
+    entries = Array.from(value.entries()).map(
+      ([k, v], index) => [`[${index}] ${String(k)}`, v] as [string, any]
+    );
+  } else if (type === 'set') {
+    entries = Array.from(value.values()).map(
+      (item: any, index: number) => [String(index), item] as [string, any]
+    );
+  } else {
+    entries = Object.entries(value);
+  }
 
   const children = entries
     .map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`, depth + 1, displayFunctions))
