@@ -23,7 +23,21 @@ export type ValueType =
   | 'boolean'
   | 'null'
   | 'undefined'
-  | 'function';
+  | 'function'
+  | 'react-element';
+
+/**
+ * Check if a value is a React element.
+ */
+function isReactElement(value: any): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value.$$typeof === Symbol.for('react.element') ||
+      value.$$typeof === Symbol.for('react.transitional.element') ||
+      (typeof value.type !== 'undefined' && typeof value.props !== 'undefined'))
+  );
+}
 
 /**
  * Get the type of a value for display purposes.
@@ -34,6 +48,9 @@ export function getValueType(value: any): ValueType {
   }
   if (value === undefined) {
     return 'undefined';
+  }
+  if (isReactElement(value)) {
+    return 'react-element';
   }
   if (Array.isArray(value)) {
     return 'array';
@@ -75,6 +92,10 @@ export function formatValue(value: any, type: ValueType): string {
     const name = value.name;
     return name ? `[Function: ${name}]` : '[Function]';
   }
+  if (type === 'react-element') {
+    const componentName = value.type?.displayName || value.type?.name || value.type;
+    return `<${typeof componentName === 'string' ? componentName : 'Component'} />`;
+  }
   return String(value);
 }
 
@@ -102,6 +123,15 @@ export function convertToTreeData(
   displayFunctions: JsonTreeFunctionDisplay = 'as-string'
 ): JSONTreeNodeData {
   const type = getValueType(value);
+
+  // Handle React elements as primitive values to avoid circular reference issues
+  if (type === 'react-element') {
+    return {
+      value: path,
+      label: key || 'root',
+      nodeData: { type, value, key, path, depth },
+    };
+  }
 
   // Handle functions based on displayFunctions setting
   if (type === 'function') {

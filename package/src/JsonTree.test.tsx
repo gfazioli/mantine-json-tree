@@ -1,4 +1,5 @@
 import React from 'react';
+import { Loader } from '@mantine/core';
 import { render } from '@mantine-tests/core';
 import { JsonTree } from './JsonTree';
 
@@ -50,6 +51,32 @@ describe('JsonTree', () => {
       expect(container.textContent).toContain('onClick');
       expect(container.textContent).toContain('calculate');
       // Functions displayed as objects should show their properties (length, name, etc.)
+    });
+  });
+
+  describe('React components', () => {
+    it('handles React elements without crashing', () => {
+      const dataWithReactComponent = {
+        name: 'Test',
+        loader: <Loader size="xs" />,
+        button: <button type="button">Click me</button>,
+      };
+
+      const { container } = render(<JsonTree data={dataWithReactComponent} defaultExpanded />);
+      expect(container).toBeTruthy();
+      expect(container.textContent).toContain('name');
+      expect(container.textContent).toContain('loader');
+      expect(container.textContent).toContain('button');
+    });
+
+    it('displays React elements with component name', () => {
+      const dataWithReactComponent = {
+        loader: <Loader size="xs" />,
+      };
+
+      const { container } = render(<JsonTree data={dataWithReactComponent} defaultExpanded />);
+      // Should show the component in a recognizable format
+      expect(container.textContent).toContain('loader');
     });
   });
 });
