@@ -10,7 +10,7 @@ function Demo() {
   const specialTypes = {
     // Date objects - displayed in ISO format
     createdAt: new Date('2024-01-15T10:30:00Z'),
-    updatedAt: new Date(),
+    lastModified: new Date('2024-06-20T14:45:30Z'),
 
     // Special numeric values
     notANumber: NaN,
@@ -22,8 +22,8 @@ function Demo() {
     userId: BigInt(123456789),
 
     // Symbols for unique identifiers
-    uniqueKey: Symbol('unique'),
     globalSymbol: Symbol.for('app.config'),
+    registryKey: Symbol.for('app.registry'),
 
     // Regular expressions
     emailPattern: /^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$/g,
@@ -69,7 +69,7 @@ function Demo() {
   const specialTypes = {
     // Date objects - displayed in ISO format
     createdAt: new Date('2024-01-15T10:30:00Z'),
-    updatedAt: new Date(),
+    lastModified: new Date('2024-06-20T14:45:30Z'),
 
     // Special numeric values
     notANumber: NaN,
@@ -81,8 +81,8 @@ function Demo() {
     userId: BigInt(123456789),
 
     // Symbols for unique identifiers
-    uniqueKey: Symbol('unique'),
     globalSymbol: Symbol.for('app.config'),
+    registryKey: Symbol.for('app.registry'),
 
     // Regular expressions
     emailPattern: /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/g,
@@ -127,4 +127,5 @@ export const specialTypes: MantineDemo = {
   type: 'code',
   component: Demo,
   code,
+  defaultExpanded: false,
 };
