@@ -1,6 +1,6 @@
 # Mantine Json Tree Component
 
-<img alt="Mantine Json Tree" src="https://github.com/gfazioli/mantine-json-tree/blob/master/logo.png" />
+<img alt="Mantine Json Tree" src="https://github.com/gfazioli/mantine-json-tree/blob/master/logo.jpeg" />
 
 <div align="center">
   
