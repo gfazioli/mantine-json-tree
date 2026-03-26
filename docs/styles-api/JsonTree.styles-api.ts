@@ -59,7 +59,9 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     copyButton: {},
     expandCollapse: {},
     keyValueSeparator: {},
-    ellipsis: {},
+    ellipsis: {
+      '--json-tree-color-ellipsis': 'Color for the ellipsis indicator on collapsed nodes',
+    },
     itemsCount: {},
     controls: {},
   },

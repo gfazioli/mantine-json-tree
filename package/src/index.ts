@@ -7,3 +7,4 @@ export type {
   JsonTreeProps,
   JsonTreeStylesNames,
 } from './JsonTree';
+export type { JSONTreeNodeData, ValueType } from './lib/utils';

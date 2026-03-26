@@ -1,3 +1,4 @@
+export { callbacks } from './JsonTree.demo.callbacks';
 export { configurator } from './JsonTree.demo.configurator';
 export { customIcons } from './JsonTree.demo.customIcons';
 export { functions } from './JsonTree.demo.functions';

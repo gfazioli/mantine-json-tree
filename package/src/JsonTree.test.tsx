@@ -161,4 +161,79 @@ describe('JsonTree', () => {
       expect(container.textContent).toContain('react');
     });
   });
+
+  describe('interactive props', () => {
+    it('renders title when provided', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} title="My JSON" />);
+      expect(container.textContent).toContain('My JSON');
+    });
+
+    it('renders item count badges when showItemsCount is true', () => {
+      const { container } = render(<JsonTree data={{ a: 1, b: 2, c: 3 }} showItemsCount />);
+      expect(container.textContent).toContain('3');
+    });
+
+    it('renders copy buttons when withCopyToClipboard is true', () => {
+      const { container } = render(
+        <JsonTree data={{ a: 1 }} defaultExpanded withCopyToClipboard />
+      );
+      const copyButtons = container.querySelectorAll('button[class*="copyButton"]');
+      expect(copyButtons.length).toBeGreaterThan(0);
+    });
+
+    it('renders indent guides when showIndentGuides is true', () => {
+      const nestedData = { level1: { level2: { level3: 'deep' } } };
+      const { container } = render(<JsonTree data={nestedData} defaultExpanded showIndentGuides />);
+      const guides = container.querySelectorAll('[data-color-index]');
+      expect(guides.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('renders empty object', () => {
+      const { container } = render(<JsonTree data={{}} />);
+      expect(container).toBeTruthy();
+      expect(container.textContent).toContain('{');
+      expect(container.textContent).toContain('}');
+    });
+
+    it('renders empty array', () => {
+      const { container } = render(<JsonTree data={[]} />);
+      expect(container).toBeTruthy();
+    });
+
+    it('renders primitive string as root data', () => {
+      const { container } = render(<JsonTree data="hello" />);
+      expect(container.textContent).toContain('hello');
+    });
+
+    it('renders primitive number as root data', () => {
+      const { container } = render(<JsonTree data={42} />);
+      expect(container.textContent).toContain('42');
+    });
+
+    it('expands all nodes when defaultExpanded and maxDepth is -1', () => {
+      const deepData = { a: { b: { c: { d: 'deep' } } } };
+      const { container } = render(<JsonTree data={deepData} defaultExpanded maxDepth={-1} />);
+      expect(container.textContent).toContain('deep');
+    });
+
+    it('keeps nodes collapsed when defaultExpanded is false', () => {
+      const nestedData = { a: { b: 'collapsed-value' } };
+      const { container } = render(<JsonTree data={nestedData} defaultExpanded={false} />);
+      expect(container.textContent).not.toContain('collapsed-value');
+    });
+  });
+
+  describe('responsive size', () => {
+    it('accepts a responsive object for size without crashing', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} size={{ base: 'xs', md: 'lg' }} />);
+      expect(container).toBeTruthy();
+    });
+
+    it('accepts a string size value', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} size="sm" />);
+      expect(container).toBeTruthy();
+    });
+  });
 });

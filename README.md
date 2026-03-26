@@ -19,9 +19,22 @@
 
 This component is created on top of the [Mantine](https://mantine.dev/) library.
 
-[Mantine JsonTree](https://gfazioli.github.io/mantine-json-tree) provides a structured, interactive view of heterogeneous data—strings, numbers, booleans, nulls, objects, arrays, and even functions—organized as a collapsible tree. Developers can control initial expansion, show visual indent guides, and customize expand/collapse controls with arbitrary React nodes (e.g., emojis or styled icons) to match their design system. For function values, the component offers flexible rendering modes: show the function signature as text, hide functions entirely, or inspect them as objects when needed. 
+[Mantine JsonTree](https://gfazioli.github.io/mantine-json-tree) provides a structured, interactive view of heterogeneous data—strings, numbers, booleans, nulls, objects, arrays, and even functions—organized as a collapsible tree. Developers can control initial expansion, show visual indent guides, and customize expand/collapse controls with arbitrary React nodes (e.g., emojis or styled icons) to match their design system. For function values, the component offers flexible rendering modes: show the function signature as text, hide functions entirely, or inspect them as objects when needed.
 
 Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTree integrates cleanly into dashboards, developer tools, and documentation pages where readable, navigable data visualization is essential.
+
+## Features
+
+- Interactive collapsible tree view for any JSON-serializable data
+- Syntax highlighting with customizable colors for 16+ data types (strings, numbers, booleans, null, Date, RegExp, Map, Set, BigInt, Symbol, React elements, etc.)
+- Copy-to-clipboard on individual nodes
+- Configurable expansion depth with expand/collapse all controls
+- Visual indent guides with rotating color palette
+- Sticky header support with configurable offset
+- Function display modes: as-string, hide, or as-object introspection
+- Full Mantine Styles API support with 12 style selectors and 25+ CSS variables
+- Custom icons for expand/collapse and copy controls
+- Item count badges for objects and arrays
 
 > [!note]
 >

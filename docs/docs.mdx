@@ -76,6 +76,20 @@ By default, functions in JSON data are displayed as strings (e.g., `[Function: n
 
 <Demo data={demos.functions} />
 
+## Callbacks
+
+Use the `onNodeClick` callback to handle clicks on any node in the tree, and the `onCopy` callback to react when a value is copied to clipboard. Both callbacks provide the relevant data for integration with your application logic.
+
+<Demo data={demos.callbacks} />
+
+## Responsive size
+
+The `size` prop supports responsive values using Mantine breakpoint objects. This allows you to set different font sizes based on the viewport width, using CSS media queries (no JavaScript re-renders):
+
+```tsx
+<JsonTree data={data} size={{ base: 'xs', sm: 'sm', lg: 'md' }} />
+```
+
 ## Style the component with classNames
 
 You can style the `JsonTree` component using the `classNames` prop to target specific inner elements. This allows for granular customization of the component's appearance.
