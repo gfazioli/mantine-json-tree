@@ -1,6 +1,18 @@
 import { InstallScript } from './components/InstallScript/InstallScript';
 import * as demos from './demos';
 
+## What's new
+
+- Dark mode support with automatic color adaptation
+- Line numbers display (`showLineNumbers`)
+- Path tooltip on hover (`showPathOnHover`)
+- Max height with scrollable container (`maxHeight`)
+- Controlled expand/collapse state (`expanded`, `onExpandedChange`)
+- `onExpand` and `onCollapse` callbacks for individual node toggling
+- Keyboard copy: `Ctrl+C` / `Cmd+C` copies the focused node when `withCopyToClipboard` is enabled
+- Responsive `size` prop via Mantine breakpoint objects (CSS-native, no re-renders)
+- New `lineNumber` style selector with `--json-tree-color-line-number` CSS variable
+
 ## Installation
 
 <InstallScript packages="@gfazioli/mantine-json-tree" />
@@ -52,6 +64,12 @@ Display vertical lines to visualize nesting levels, similar to Visual Studio Cod
 
 <Demo data={demos.indentGuides} />
 
+## Line Numbers
+
+Display line numbers alongside each node, similar to code editors. This is useful for referencing specific parts of the JSON structure.
+
+<Demo data={demos.lineNumbers} />
+
 ## Sticky Header
 
 You may enable sticky headers for better context when scrolling through large JSON structures. When enabled, the header of each expanded node remains visible at the top of the scrollable area as you navigate through its child elements. You can also set an offset to accommodate fixed headers in your layout.
@@ -81,6 +99,47 @@ By default, functions in JSON data are displayed as strings (e.g., `[Function: n
 Use the `onNodeClick` callback to handle clicks on any node in the tree, and the `onCopy` callback to react when a value is copied to clipboard. Both callbacks provide the relevant data for integration with your application logic.
 
 <Demo data={demos.callbacks} />
+
+## Keyboard Navigation
+
+`JsonTree` inherits full keyboard navigation from Mantine's Tree component:
+
+- **Arrow Up/Down**: Navigate between nodes
+- **Arrow Right**: Expand a collapsed node or move to first child
+- **Arrow Left**: Collapse an expanded node or move to parent
+- **Space**: Toggle node expansion
+- **Ctrl+C / Cmd+C**: Copy the focused node's value to clipboard (when `withCopyToClipboard` is enabled)
+
+## Path Tooltip
+
+Set `showPathOnHover` to display the full JSON path in a tooltip when hovering over any node. This is useful for identifying the exact path to a value in deeply nested structures. You can customize the tooltip behavior with the `tooltipProps` prop, which accepts all [Tooltip](https://mantine.dev/core/tooltip/) props except `label` and `children`.
+
+<Demo data={demos.pathTooltip} />
+
+## Max Height
+
+Use the `maxHeight` prop to limit the tree height and enable scrolling. This is useful for embedding the tree in layouts with limited vertical space.
+
+<Demo data={demos.maxHeightDemo} />
+
+## Controlled Expand State
+
+Use the `expanded` and `onExpandedChange` props for controlled expand/collapse state. The `onExpand` and `onCollapse` callbacks fire for individual node toggling:
+
+```tsx
+const [expanded, setExpanded] = useState<string[]>([
+  'root',
+  'root.settings',
+]);
+
+<JsonTree
+  data={data}
+  expanded={expanded}
+  onExpandedChange={setExpanded}
+  onExpand={(path) => console.log('Expanded:', path)}
+  onCollapse={(path) => console.log('Collapsed:', path)}
+/>;
+```
 
 ## Responsive size
 

@@ -1,44 +1,40 @@
 import { JsonTree, JsonTreeProps } from '@gfazioli/mantine-json-tree';
-import { ScrollArea } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
 import { data, dataCode } from './data';
 
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
-import { ScrollArea } from '@mantine/core';
 import { data } from './data';
 
 function Demo() {
   return (
-    <ScrollArea style={{ height: 300 }}>
-      <JsonTree{{props}}
-        data={data}
-        title="data.json"
-        defaultExpanded
-        withExpandAll
-        styles={{
-          header: { backgroundColor: 'var(--mantine-color-default)' },
-        }}
-      />
-    </ScrollArea>
+    <JsonTree{{props}}
+      data={data}
+      title="data.json"
+      defaultExpanded
+      withExpandAll
+      maxHeight={300}
+      styles={{
+        header: { backgroundColor: 'var(--mantine-color-default)' },
+      }}
+    />
   );
 }
 `;
 
 function Demo(props: JsonTreeProps) {
   return (
-    <ScrollArea style={{ height: 300 }}>
-      <JsonTree
-        {...props}
-        data={data}
-        title="data.json"
-        defaultExpanded
-        withExpandAll
-        styles={{
-          header: { backgroundColor: 'var(--mantine-color-default)' },
-        }}
-      />
-    </ScrollArea>
+    <JsonTree
+      {...props}
+      data={data}
+      title="data.json"
+      defaultExpanded
+      withExpandAll
+      maxHeight={300}
+      styles={{
+        header: { backgroundColor: 'var(--mantine-color-default)' },
+      }}
+    />
   );
 }
 

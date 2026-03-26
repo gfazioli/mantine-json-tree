@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { IconChevronRight, IconCopy, IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
 import {
   ActionIcon,
@@ -12,8 +12,10 @@ import {
   Group,
   MantineSize,
   rem,
+  ScrollArea,
   StylesApiProps,
   Text,
+  Tooltip,
   Tree,
   useProps,
   useRandomClassName,
@@ -22,10 +24,12 @@ import {
   type BoxProps,
   type RenderTreeNodePayload,
   type StyleProp,
+  type TooltipProps,
 } from '@mantine/core';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import {
   convertToTreeData,
+  findNodeByPath,
   formatValue,
   isExpandable,
   type JSONTreeNodeData,
@@ -45,7 +49,8 @@ export type JsonTreeStylesNames =
   | 'ellipsis'
   | 'itemsCount'
   | 'indentGuide'
-  | 'copyButton';
+  | 'copyButton'
+  | 'lineNumber';
 
 export type JsonTreeCssVariables = {
   root: '--json-tree-font-family' | '--json-tree-font-size';
@@ -75,6 +80,7 @@ export type JsonTreeCssVariables = {
     | '--json-tree-indent-guide-color-4';
   expandCollapse: never;
   ellipsis: '--json-tree-color-ellipsis';
+  lineNumber: '--json-tree-color-line-number';
   itemsCount: never;
   controls: never;
   keyValueSeparator: never;
@@ -97,6 +103,12 @@ export interface JsonTreeBaseProps {
   /** Callback when a value is copied to clipboard */
   onCopy?: (copy: string, value: unknown) => void;
 
+  /** Callback when a node is expanded */
+  onExpand?: (path: string) => void;
+
+  /** Callback when a node is collapsed */
+  onCollapse?: (path: string) => void;
+
   /** Whether to show the root expand/collapse all button @default false */
   withExpandAll?: boolean;
 
@@ -114,6 +126,24 @@ export interface JsonTreeBaseProps {
 
   /** Whether to show indent guides (vertical lines) for nested nodes @default false */
   showIndentGuides?: boolean;
+
+  /** Whether to show line numbers @default false */
+  showLineNumbers?: boolean;
+
+  /** Whether to show the full JSON path in a tooltip on hover @default false */
+  showPathOnHover?: boolean;
+
+  /** Props passed to the Tooltip component when showPathOnHover is enabled */
+  tooltipProps?: Omit<TooltipProps, 'label' | 'children'>;
+
+  /** Maximum height of the tree, enables scrolling when content exceeds this value */
+  maxHeight?: React.CSSProperties['maxHeight'];
+
+  /** Controlled expanded state (array of node paths that are expanded) */
+  expanded?: string[];
+
+  /** Callback when expanded state changes */
+  onExpandedChange?: (expanded: string[]) => void;
 
   /** If set, the header is sticky @default `false` */
   stickyHeader?: boolean;
@@ -160,6 +190,8 @@ export const defaultProps: Partial<JsonTreeProps> = {
   showItemsCount: false,
   withCopyToClipboard: false,
   showIndentGuides: false,
+  showLineNumbers: false,
+  showPathOnHover: false,
   stickyHeader: false,
   displayFunctions: 'as-string',
   expandAllControlIcon: <IconLibraryPlus size={16} />,
@@ -172,6 +204,9 @@ interface RenderNodeContext {
   copyToClipboardIcon: React.ReactNode;
   expandControlIcon: React.ReactNode;
   collapseControlIcon: React.ReactNode;
+  onExpand?: (path: string) => void;
+  onCollapse?: (path: string) => void;
+  onExpandedChange?: (expanded: string[]) => void;
 }
 
 function renderJSONNode(
@@ -180,7 +215,15 @@ function renderJSONNode(
   ctx: RenderNodeContext,
   onNodeClick?: (path: string, value: any) => void
 ) {
-  const { getStyles, copyToClipboardIcon, expandControlIcon, collapseControlIcon } = ctx;
+  const {
+    getStyles,
+    copyToClipboardIcon,
+    expandControlIcon,
+    collapseControlIcon,
+    onExpand,
+    onCollapse,
+    onExpandedChange,
+  } = ctx;
   const jsonNode = node as JSONTreeNodeData;
 
   const {
@@ -197,7 +240,15 @@ function renderJSONNode(
     depth: 0,
   };
 
-  const { showItemsCount, withCopyToClipboard, onCopy, showIndentGuides } = props;
+  const {
+    showItemsCount,
+    withCopyToClipboard,
+    onCopy,
+    showIndentGuides,
+    showLineNumbers,
+    showPathOnHover,
+    tooltipProps,
+  } = props;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -213,6 +264,20 @@ function renderJSONNode(
   const handleClick = () => {
     if (onNodeClick) {
       onNodeClick(path, value);
+    }
+  };
+
+  const handleToggleExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    tree.toggleExpanded(node.value);
+    if (expanded) {
+      onCollapse?.(node.value);
+    } else {
+      onExpand?.(node.value);
+    }
+    if (onExpandedChange) {
+      const newState = { ...tree.expandedState, [node.value]: !expanded };
+      onExpandedChange(Object.keys(newState).filter((k) => newState[k]));
     }
   };
 
@@ -240,9 +305,20 @@ function renderJSONNode(
     return guides;
   };
 
+  const lineNumber = showLineNumbers ? <span {...getStyles('lineNumber')} /> : null;
+
+  const wrapWithTooltip = (content: React.ReactElement) =>
+    showPathOnHover ? (
+      <Tooltip label={path} position="top-start" withArrow openDelay={300} {...tooltipProps}>
+        {content}
+      </Tooltip>
+    ) : (
+      content
+    );
+
   // Render primitive value
   if (!hasChildren) {
-    return (
+    return wrapWithTooltip(
       <Group
         gap={4}
         wrap="nowrap"
@@ -250,6 +326,7 @@ function renderJSONNode(
         onClick={handleClick}
         style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
       >
+        {lineNumber}
         {renderIndentGuides()}
         {key !== undefined && (
           <>
@@ -318,7 +395,7 @@ function renderJSONNode(
     return expanded ? collapseControlIcon : expandControlIcon;
   })();
 
-  return (
+  return wrapWithTooltip(
     <Group
       gap={4}
       wrap="nowrap"
@@ -329,14 +406,12 @@ function renderJSONNode(
       data-type={type}
       style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
     >
+      {lineNumber}
       {renderIndentGuides()}
       <ActionIcon
         size="xs"
         variant="subtle"
-        onClick={(e) => {
-          e.stopPropagation();
-          tree.toggleExpanded(node.value);
-        }}
+        onClick={handleToggleExpanded}
         {...getStyles('expandCollapse')}
       >
         {expandCollapseIcon}
@@ -429,6 +504,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       expandCollapse: {},
       keyValueSeparator: {},
       ellipsis: { '--json-tree-color-ellipsis': 'var(--mantine-color-dark-3)' },
+      lineNumber: { '--json-tree-color-line-number': 'var(--mantine-color-gray-5)' },
       itemsCount: {},
       controls: {},
       copyButton: {},
@@ -445,12 +521,20 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     maxDepth,
     onNodeClick,
     onCopy,
+    onExpand,
+    onCollapse,
     withExpandAll,
     variant,
     title,
     showItemsCount,
     withCopyToClipboard,
     showIndentGuides,
+    showLineNumbers,
+    showPathOnHover,
+    tooltipProps,
+    maxHeight,
+    expanded: controlledExpanded,
+    onExpandedChange,
     stickyHeaderOffset,
     stickyHeader,
     displayFunctions,
@@ -495,12 +579,10 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   // Calculate initial expanded state based on maxDepth
   const initialExpandedState = useMemo(() => {
     if (defaultExpanded) {
-      // Expand all nodes if maxDepth is -1
       if (maxDepth === -1) {
         return getTreeExpandedState(treeData, '*');
       }
 
-      // Otherwise, expand nodes up to maxDepth
       const expandedNodes: string[] = [];
       const traverse = (nodes: JSONTreeNodeData[], depth: number) => {
         nodes.forEach((node) => {
@@ -520,17 +602,73 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     initialExpandedState,
   });
 
+  // Sync controlled expanded state
+  useEffect(() => {
+    if (controlledExpanded) {
+      const state: Record<string, boolean> = {};
+      controlledExpanded.forEach((path) => {
+        state[path] = true;
+      });
+      tree.setExpandedState(state);
+    }
+  }, [controlledExpanded]);
+
+  // Keyboard handler for Ctrl+C copy on focused node
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && withCopyToClipboard) {
+        const focused = (e.currentTarget as HTMLElement).querySelector(
+          '[data-value][tabindex="0"], [data-value]:focus'
+        );
+        if (focused) {
+          const nodePath = focused.getAttribute('data-value');
+          if (nodePath) {
+            const nodeData = findNodeByPath(treeData, nodePath);
+            if (nodeData?.nodeData) {
+              try {
+                const copy = JSON.stringify(nodeData.nodeData.value, null, 2);
+                navigator.clipboard.writeText(copy);
+                onCopy?.(copy, nodeData.nodeData.value);
+              } catch {
+                // Clipboard write may fail silently
+              }
+            }
+          }
+        }
+      }
+    },
+    [withCopyToClipboard, treeData, onCopy]
+  );
+
   const renderCtx: RenderNodeContext = {
     getStyles,
     copyToClipboardIcon,
     expandControlIcon,
     collapseControlIcon,
+    onExpand,
+    onCollapse,
+    onExpandedChange,
   };
+
+  const treeComponent = (
+    <Tree
+      data={treeData}
+      tree={tree}
+      levelOffset={32}
+      renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
+    />
+  );
 
   return (
     <>
       <JsonTreeMediaVariables size={size} selector={`.${responsiveClassName}`} />
-      <Box ref={ref} {...getStyles('root', { className: responsiveClassName })} {...others}>
+      <Box
+        ref={ref}
+        {...getStyles('root', { className: responsiveClassName })}
+        {...others}
+        data-line-numbers={showLineNumbers || undefined}
+        onKeyDown={handleKeyDown}
+      >
         {(title || withExpandAll) && (
           <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
             {title || <div />}
@@ -539,7 +677,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
                 <ActionIcon
                   size="xs"
                   variant="transparent"
-                  onClick={() => tree.expandAllNodes()}
+                  onClick={() => {
+                    tree.expandAllNodes();
+                    if (onExpandedChange) {
+                      const allState = getTreeExpandedState(treeData, '*');
+                      onExpandedChange(Object.keys(allState).filter((k) => allState[k]));
+                    }
+                  }}
                   {...getStyles('controls')}
                 >
                   {expandAllControlIcon}
@@ -548,7 +692,10 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
                 <ActionIcon
                   size="xs"
                   variant="transparent"
-                  onClick={() => tree.collapseAllNodes()}
+                  onClick={() => {
+                    tree.collapseAllNodes();
+                    onExpandedChange?.([]);
+                  }}
                   {...getStyles('controls')}
                 >
                   {collapseAllControlIcon}
@@ -557,12 +704,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
             )}
           </Group>
         )}
-        <Tree
-          data={treeData}
-          tree={tree}
-          levelOffset={32}
-          renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
-        />
+        {maxHeight ? (
+          <ScrollArea.Autosize mah={maxHeight}>{treeComponent}</ScrollArea.Autosize>
+        ) : (
+          treeComponent
+        )}
       </Box>
     </>
   );

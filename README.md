@@ -27,14 +27,22 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 
 - Interactive collapsible tree view for any JSON-serializable data
 - Syntax highlighting with customizable colors for 16+ data types (strings, numbers, booleans, null, Date, RegExp, Map, Set, BigInt, Symbol, React elements, etc.)
+- Dark mode support with automatic color adaptation
 - Copy-to-clipboard on individual nodes
+- Keyboard navigation (arrow keys, Space to expand, Ctrl+C to copy)
 - Configurable expansion depth with expand/collapse all controls
+- Controlled expand/collapse state with `expanded` and `onExpandedChange` props
+- Line numbers display
 - Visual indent guides with rotating color palette
+- Path tooltip on hover showing full JSON path
+- Max height with scrollable container
 - Sticky header support with configurable offset
 - Function display modes: as-string, hide, or as-object introspection
-- Full Mantine Styles API support with 12 style selectors and 25+ CSS variables
+- Responsive font size via Mantine breakpoint objects (CSS-native, no re-renders)
+- Full Mantine Styles API support with 13 style selectors and 25+ CSS variables
 - Custom icons for expand/collapse and copy controls
 - Item count badges for objects and arrays
+- `onExpand`, `onCollapse`, `onNodeClick`, and `onCopy` callbacks
 
 > [!note]
 >

@@ -236,4 +236,44 @@ describe('JsonTree', () => {
       expect(container).toBeTruthy();
     });
   });
+
+  describe('new features', () => {
+    it('renders line numbers when showLineNumbers is true', () => {
+      const { container } = render(
+        <JsonTree data={{ a: 1, b: 2 }} defaultExpanded showLineNumbers />
+      );
+      expect(container.querySelector('[data-line-numbers]')).toBeTruthy();
+    });
+
+    it('renders with showPathOnHover without crashing', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} defaultExpanded showPathOnHover />);
+      expect(container).toBeTruthy();
+    });
+
+    it('renders with maxHeight as scrollable container', () => {
+      const { container } = render(
+        <JsonTree data={{ a: 1, b: 2, c: 3 }} defaultExpanded maxHeight={200} />
+      );
+      expect(container).toBeTruthy();
+    });
+
+    it('accepts controlled expanded state', () => {
+      const { container } = render(<JsonTree data={{ a: { b: 'value' } }} expanded={['root']} />);
+      expect(container).toBeTruthy();
+    });
+
+    it('renders with onExpand and onCollapse callbacks without crashing', () => {
+      const onExpand = jest.fn();
+      const onCollapse = jest.fn();
+      const { container } = render(
+        <JsonTree
+          data={{ a: { b: 'value' } }}
+          defaultExpanded
+          onExpand={onExpand}
+          onCollapse={onCollapse}
+        />
+      );
+      expect(container).toBeTruthy();
+    });
+  });
 });
