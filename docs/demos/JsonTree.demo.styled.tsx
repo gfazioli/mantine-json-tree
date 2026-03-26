@@ -63,6 +63,7 @@ const moduleCss = `
 
 .itemsCount {
   background-color: var(--mantine-primary-color-6);
+  color: var(--mantine-color-white);
   animation: pulse 2s infinite reverse;
 }
 `;

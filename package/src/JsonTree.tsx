@@ -8,7 +8,6 @@ import {
   createVarsResolver,
   Factory,
   factory,
-  getFontSize,
   getTreeExpandedState,
   Group,
   MantineSize,
@@ -16,14 +15,15 @@ import {
   StylesApiProps,
   Text,
   Tree,
-  useMantineTheme,
   useProps,
+  useRandomClassName,
   useStyles,
   useTree,
   type BoxProps,
-  type MantineTheme,
   type RenderTreeNodePayload,
+  type StyleProp,
 } from '@mantine/core';
+import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import {
   convertToTreeData,
   formatValue,
@@ -32,8 +32,6 @@ import {
   type ValueType,
 } from './lib/utils';
 import classes from './JsonTree.module.css';
-
-export type JsonTreeDirection = 'clockwise' | 'counter-clockwise';
 
 export type JsonTreeStylesNames =
   | 'root'
@@ -76,7 +74,7 @@ export type JsonTreeCssVariables = {
     | '--json-tree-indent-guide-color-3'
     | '--json-tree-indent-guide-color-4';
   expandCollapse: never;
-  ellipsis: never;
+  ellipsis: '--json-tree-color-ellipsis';
   itemsCount: never;
   controls: never;
   keyValueSeparator: never;
@@ -102,8 +100,8 @@ export interface JsonTreeBaseProps {
   /** Whether to show the root expand/collapse all button @default false */
   withExpandAll?: boolean;
 
-  /** Size of the font @default 'xs' */
-  size?: MantineSize | (string & {}) | number;
+  /** Size of the font, supports responsive object @default 'xs' */
+  size?: StyleProp<MantineSize | (string & {}) | number>;
 
   /** Title displayed above the JSON tree  */
   title?: React.ReactNode;
@@ -169,12 +167,233 @@ export const defaultProps: Partial<JsonTreeProps> = {
   copyToClipboardIcon: <IconCopy size={12} />,
 };
 
+interface RenderNodeContext {
+  getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
+  copyToClipboardIcon: React.ReactNode;
+  expandControlIcon: React.ReactNode;
+  collapseControlIcon: React.ReactNode;
+}
+
+function renderJSONNode(
+  { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
+  props: JsonTreeProps,
+  ctx: RenderNodeContext,
+  onNodeClick?: (path: string, value: any) => void
+) {
+  const { getStyles, copyToClipboardIcon, expandControlIcon, collapseControlIcon } = ctx;
+  const jsonNode = node as JSONTreeNodeData;
+
+  const {
+    type,
+    value,
+    key,
+    path,
+    itemCount,
+    depth = 0,
+  } = jsonNode.nodeData || {
+    type: 'null' as ValueType,
+    value: null,
+    path: 'unknown',
+    depth: 0,
+  };
+
+  const { showItemsCount, withCopyToClipboard, onCopy, showIndentGuides } = props;
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const copy = JSON.stringify(value, null, 2);
+      await navigator.clipboard.writeText(copy);
+      onCopy?.(copy, value);
+    } catch (error) {
+      // Clipboard write may fail silently in unsupported contexts
+    }
+  };
+
+  const handleClick = () => {
+    if (onNodeClick) {
+      onNodeClick(path, value);
+    }
+  };
+
+  // Render indent guides (vertical lines)
+  const renderIndentGuides = () => {
+    if (!showIndentGuides || depth === 0) {
+      return null;
+    }
+
+    const guides = [];
+    for (let i = 0; i < depth; i++) {
+      const colorIndex = i % 5;
+      guides.push(
+        <div
+          key={i}
+          {...getStyles('indentGuide', {
+            style: {
+              left: `${i * 32 + 8}px`,
+            },
+          })}
+          data-color-index={colorIndex}
+        />
+      );
+    }
+    return guides;
+  };
+
+  // Render primitive value
+  if (!hasChildren) {
+    return (
+      <Group
+        gap={4}
+        wrap="nowrap"
+        {...elementProps}
+        onClick={handleClick}
+        style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+      >
+        {renderIndentGuides()}
+        {key !== undefined && (
+          <>
+            <Text component="span" {...getStyles('key')} data-key={key}>
+              {key}
+            </Text>
+            <Text component="span" {...getStyles('keyValueSeparator')}>
+              :
+            </Text>
+          </>
+        )}
+        {(() => {
+          const formattedValue = formatValue(value, type);
+          return (
+            <Code {...getStyles('value')} data-type={type} data-value={formattedValue}>
+              {formattedValue}
+            </Code>
+          );
+        })()}
+
+        {withCopyToClipboard && (
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            color="gray"
+            onClick={handleCopy}
+            {...getStyles('copyButton')}
+          >
+            {copyToClipboardIcon}
+          </ActionIcon>
+        )}
+      </Group>
+    );
+  }
+
+  // Render expandable object/array
+  const openBracket = type === 'array' ? '[' : '{';
+  const closeBracket = type === 'array' ? ']' : '}';
+
+  const expandCollapseIcon = (() => {
+    if (!expandControlIcon && !collapseControlIcon) {
+      return (
+        <IconChevronRight
+          size={14}
+          style={{
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      );
+    }
+
+    if (expandControlIcon && !collapseControlIcon) {
+      return React.cloneElement(expandControlIcon as React.ReactElement<any>, {
+        style: {
+          ...(expandControlIcon as React.ReactElement<any>).props?.style,
+          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+        },
+      });
+    }
+
+    if (!expandControlIcon && collapseControlIcon) {
+      return expanded ? collapseControlIcon : <IconChevronRight size={14} />;
+    }
+    return expanded ? collapseControlIcon : expandControlIcon;
+  })();
+
+  return (
+    <Group
+      gap={4}
+      wrap="nowrap"
+      {...elementProps}
+      onClick={handleClick}
+      data-expanded={expanded}
+      data-has-children={hasChildren}
+      data-type={type}
+      style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+    >
+      {renderIndentGuides()}
+      <ActionIcon
+        size="xs"
+        variant="subtle"
+        onClick={(e) => {
+          e.stopPropagation();
+          tree.toggleExpanded(node.value);
+        }}
+        {...getStyles('expandCollapse')}
+      >
+        {expandCollapseIcon}
+      </ActionIcon>
+
+      {key !== undefined && (
+        <>
+          <Text component="span" {...getStyles('key')}>
+            {key}
+          </Text>
+          <Text component="span" {...getStyles('keyValueSeparator')}>
+            :
+          </Text>
+        </>
+      )}
+
+      <Text component="span" {...getStyles('bracket')}>
+        {openBracket}
+      </Text>
+
+      {!expanded && (
+        <>
+          <Text component="span" size="xs" {...getStyles('ellipsis')}>
+            ...
+          </Text>
+          <Text component="span" {...getStyles('bracket')}>
+            {closeBracket}
+          </Text>
+          {itemCount !== undefined && showItemsCount && (
+            <Badge size="xs" variant="light" color="gray" {...getStyles('itemsCount')}>
+              {itemCount}
+            </Badge>
+          )}
+        </>
+      )}
+
+      {withCopyToClipboard && (
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          color="gray"
+          onClick={handleCopy}
+          {...getStyles('copyButton')}
+        >
+          {copyToClipboardIcon}
+        </ActionIcon>
+      )}
+    </Group>
+  );
+}
+
 const varsResolver = createVarsResolver<JsonTreeFactory>(
-  (_, { size, stickyHeader, stickyHeaderOffset }) => {
+  (_, { stickyHeader, stickyHeaderOffset }) => {
     return {
       root: {
         '--json-tree-font-family': 'var(--mantine-font-family-monospace)',
-        '--json-tree-font-size': getFontSize(size) || 'var(--mantine-font-size-xs)',
+        '--json-tree-font-size': undefined,
       },
       header: {
         '--json-tree-header-background-color': 'inherit',
@@ -209,7 +428,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       },
       expandCollapse: {},
       keyValueSeparator: {},
-      ellipsis: {},
+      ellipsis: { '--json-tree-color-ellipsis': 'var(--mantine-color-dark-3)' },
       itemsCount: {},
       controls: {},
       copyButton: {},
@@ -240,6 +459,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     copyToClipboardIcon,
     expandControlIcon,
     collapseControlIcon,
+    size,
 
     classNames,
     style,
@@ -264,7 +484,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     varsResolver,
   });
 
-  const theme = useMantineTheme();
+  const responsiveClassName = useRandomClassName();
 
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
@@ -300,254 +520,51 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     initialExpandedState,
   });
 
-  function renderJSONNode(
-    { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
-    _: MantineTheme,
-    props: JsonTreeProps,
-    onNodeClick?: (path: string, value: any) => void
-  ) {
-    const jsonNode = node as JSONTreeNodeData;
-
-    const {
-      type,
-      value,
-      key,
-      path,
-      itemCount,
-      depth = 0,
-    } = jsonNode.nodeData || {
-      type: 'null' as ValueType,
-      value: null,
-      path: 'unknown',
-      depth: 0,
-    };
-
-    const { showItemsCount, withCopyToClipboard, onCopy, showIndentGuides } = props;
-
-    const handleCopy = async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      try {
-        const copy = JSON.stringify(value, null, 2);
-        await navigator.clipboard.writeText(copy);
-        onCopy?.(copy, value);
-      } catch (error) {
-        // =jon= future use: Handle copy error if needed
-      }
-    };
-
-    const handleClick = () => {
-      if (onNodeClick) {
-        onNodeClick(path, value);
-      }
-    };
-
-    // Render indent guides (vertical lines)
-    const renderIndentGuides = () => {
-      if (!showIndentGuides || depth === 0) {
-        return null;
-      }
-
-      const guides = [];
-      for (let i = 0; i < depth; i++) {
-        const colorIndex = i % 5;
-        guides.push(
-          <div
-            key={i}
-            {...getStyles('indentGuide', {
-              style: {
-                left: `${i * 32 + 8}px`,
-              },
-            })}
-            data-color-index={colorIndex}
-          />
-        );
-      }
-      return guides;
-    };
-
-    // Render primitive value
-    if (!hasChildren) {
-      return (
-        <Group
-          gap={4}
-          wrap="nowrap"
-          {...elementProps}
-          onClick={handleClick}
-          style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
-        >
-          {renderIndentGuides()}
-          {key !== undefined && (
-            <>
-              <Text component="span" {...getStyles('key')} data-key={key}>
-                {key}
-              </Text>
-              <Text component="span" {...getStyles('keyValueSeparator')}>
-                :
-              </Text>
-            </>
-          )}
-          {(() => {
-            const formattedValue = formatValue(value, type);
-            return (
-              <Code {...getStyles('value')} data-type={type} data-value={formattedValue}>
-                {formattedValue}
-              </Code>
-            );
-          })()}
-
-          {withCopyToClipboard && (
-            <ActionIcon
-              size="xs"
-              variant="subtle"
-              color="gray"
-              onClick={handleCopy}
-              {...getStyles('copyButton')}
-            >
-              {copyToClipboardIcon}
-            </ActionIcon>
-          )}
-        </Group>
-      );
-    }
-
-    // Render expandable object/array
-    const openBracket = type === 'array' ? '[' : '{';
-    const closeBracket = type === 'array' ? ']' : '}';
-
-    const expandCollapseIcon = (() => {
-      if (!expandControlIcon && !collapseControlIcon) {
-        return (
-          <IconChevronRight
-            size={14}
-            style={{
-              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
-            }}
-          />
-        );
-      }
-
-      if (expandControlIcon && !collapseControlIcon) {
-        return React.cloneElement(expandControlIcon as React.ReactElement<any>, {
-          style: {
-            ...(expandControlIcon as React.ReactElement<any>).props?.style,
-            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          },
-        });
-      }
-
-      if (!expandControlIcon && collapseControlIcon) {
-        return expanded ? collapseControlIcon : <IconChevronRight size={14} />;
-      }
-      return expanded ? collapseControlIcon : expandControlIcon;
-    })();
-
-    return (
-      <Group
-        gap={4}
-        wrap="nowrap"
-        {...elementProps}
-        onClick={handleClick}
-        data-expanded={expanded}
-        data-has-children={hasChildren}
-        data-type={type}
-        style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
-      >
-        {renderIndentGuides()}
-        <ActionIcon
-          size="xs"
-          variant="subtle"
-          onClick={(e) => {
-            e.stopPropagation();
-            tree.toggleExpanded(node.value);
-          }}
-          {...getStyles('expandCollapse')}
-        >
-          {expandCollapseIcon}
-        </ActionIcon>
-
-        {key !== undefined && (
-          <>
-            <Text component="span" {...getStyles('key')}>
-              {key}
-            </Text>
-            <Text component="span" {...getStyles('keyValueSeparator')}>
-              :
-            </Text>
-          </>
-        )}
-
-        <Text component="span" {...getStyles('bracket')}>
-          {openBracket}
-        </Text>
-
-        {!expanded && (
-          <>
-            <Text component="span" size="xs" {...getStyles('ellipsis')}>
-              ...
-            </Text>
-            <Text component="span" {...getStyles('bracket')}>
-              {closeBracket}
-            </Text>
-            {itemCount !== undefined && showItemsCount && (
-              <Badge size="xs" variant="light" color="gray" {...getStyles('itemsCount')}>
-                {itemCount}
-              </Badge>
-            )}
-          </>
-        )}
-
-        {withCopyToClipboard && (
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            color="gray"
-            onClick={handleCopy}
-            {...getStyles('copyButton')}
-          >
-            {copyToClipboardIcon}
-          </ActionIcon>
-        )}
-      </Group>
-    );
-  }
+  const renderCtx: RenderNodeContext = {
+    getStyles,
+    copyToClipboardIcon,
+    expandControlIcon,
+    collapseControlIcon,
+  };
 
   return (
-    <Box ref={ref} {...getStyles('root')} {...others}>
-      {(title || withExpandAll) && (
-        <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
-          {title || <div />}
-          {withExpandAll && isExpandable(data) && (
-            <Group gap="xs" style={{ top: 10, zIndex: 1 }}>
-              <ActionIcon
-                size="xs"
-                variant="transparent"
-                onClick={() => tree.expandAllNodes()}
-                {...getStyles('controls')}
-              >
-                {expandAllControlIcon}
-              </ActionIcon>
+    <>
+      <JsonTreeMediaVariables size={size} selector={`.${responsiveClassName}`} />
+      <Box ref={ref} {...getStyles('root', { className: responsiveClassName })} {...others}>
+        {(title || withExpandAll) && (
+          <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
+            {title || <div />}
+            {withExpandAll && isExpandable(data) && (
+              <Group gap="xs" style={{ top: 10, zIndex: 1 }}>
+                <ActionIcon
+                  size="xs"
+                  variant="transparent"
+                  onClick={() => tree.expandAllNodes()}
+                  {...getStyles('controls')}
+                >
+                  {expandAllControlIcon}
+                </ActionIcon>
 
-              <ActionIcon
-                size="xs"
-                variant="transparent"
-                onClick={() => tree.collapseAllNodes()}
-                {...getStyles('controls')}
-              >
-                {collapseAllControlIcon}
-              </ActionIcon>
-            </Group>
-          )}
-        </Group>
-      )}
-      <Tree
-        data={treeData}
-        tree={tree}
-        levelOffset={32}
-        renderNode={(payload) => renderJSONNode(payload, theme, props, onNodeClick)}
-      />
-    </Box>
+                <ActionIcon
+                  size="xs"
+                  variant="transparent"
+                  onClick={() => tree.collapseAllNodes()}
+                  {...getStyles('controls')}
+                >
+                  {collapseAllControlIcon}
+                </ActionIcon>
+              </Group>
+            )}
+          </Group>
+        )}
+        <Tree
+          data={treeData}
+          tree={tree}
+          levelOffset={32}
+          renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
+        />
+      </Box>
+    </>
   );
 });
 
