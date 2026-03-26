@@ -276,6 +276,8 @@ function renderJSONNode(
       onExpand?.(node.value);
     }
     if (onExpandedChange) {
+      // Build new state manually since tree.expandedState may not reflect
+      // the toggleExpanded call yet (React setState is async)
       const newState = { ...tree.expandedState, [node.value]: !expanded };
       onExpandedChange(Object.keys(newState).filter((k) => newState[k]));
     }
@@ -524,7 +526,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     onExpand,
     onCollapse,
     withExpandAll,
-    variant,
     title,
     showItemsCount,
     withCopyToClipboard,
@@ -611,11 +612,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
       });
       tree.setExpandedState(state);
     }
-  }, [controlledExpanded]);
+  }, [controlledExpanded, tree.setExpandedState]);
 
   // Keyboard handler for Ctrl+C copy on focused node
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    async (e: React.KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'c' && withCopyToClipboard) {
         const focused = (e.currentTarget as HTMLElement).querySelector(
           '[data-value][tabindex="0"], [data-value]:focus'
@@ -627,10 +628,10 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
             if (nodeData?.nodeData) {
               try {
                 const copy = JSON.stringify(nodeData.nodeData.value, null, 2);
-                navigator.clipboard.writeText(copy);
+                await navigator.clipboard.writeText(copy);
                 onCopy?.(copy, nodeData.nodeData.value);
               } catch {
-                // Clipboard write may fail silently
+                // Clipboard write may fail silently in unsupported contexts
               }
             }
           }
