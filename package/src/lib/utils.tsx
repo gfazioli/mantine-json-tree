@@ -279,3 +279,24 @@ export function convertToTreeData(
     nodeData: { type, value, key, path, itemCount: getItemCount(value), depth },
   };
 }
+
+/**
+ * Find a node in the tree by its path value.
+ */
+export function findNodeByPath(
+  nodes: JSONTreeNodeData[],
+  targetPath: string
+): JSONTreeNodeData | null {
+  for (const node of nodes) {
+    if (node.value === targetPath) {
+      return node;
+    }
+    if (node.children) {
+      const found = findNodeByPath(node.children as JSONTreeNodeData[], targetPath);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}

@@ -15,6 +15,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     indentGuide: 'Element that renders indent guides',
     copyButton: 'Copy to clipboard button',
     ellipsis: 'Element that renders ellipsis for collapsed nodes',
+    lineNumber: 'Element that renders line numbers',
   },
 
   vars: {
@@ -61,6 +62,9 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     keyValueSeparator: {},
     ellipsis: {
       '--json-tree-color-ellipsis': 'Color for the ellipsis indicator on collapsed nodes',
+    },
+    lineNumber: {
+      '--json-tree-color-line-number': 'Color for line numbers',
     },
     itemsCount: {},
     controls: {},
