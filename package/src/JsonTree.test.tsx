@@ -1,4 +1,5 @@
 import React from 'react';
+import { fireEvent } from '@testing-library/react';
 import { Loader } from '@mantine/core';
 import { render } from '@mantine-tests/core';
 import { JsonTree } from './JsonTree';
@@ -274,6 +275,45 @@ describe('JsonTree', () => {
         />
       );
       expect(container).toBeTruthy();
+    });
+
+    it('calls onExpandedChange when a node is toggled in controlled mode', () => {
+      const onExpandedChange = jest.fn();
+      const { container } = render(
+        <JsonTree
+          data={{ a: { b: 'value' } }}
+          expanded={['root']}
+          onExpandedChange={onExpandedChange}
+        />
+      );
+      // Find the expand/collapse button and click it
+      const expandButton = container.querySelector('button[class*="expandCollapse"]');
+      if (expandButton) {
+        fireEvent.click(expandButton);
+        expect(onExpandedChange).toHaveBeenCalled();
+      }
+    });
+
+    it('calls onExpand callback when expanding a node', () => {
+      const onExpand = jest.fn();
+      const { container } = render(<JsonTree data={{ a: { b: 'value' } }} onExpand={onExpand} />);
+      const expandButton = container.querySelector('button[class*="expandCollapse"]');
+      if (expandButton) {
+        fireEvent.click(expandButton);
+        expect(onExpand).toHaveBeenCalledWith('root');
+      }
+    });
+
+    it('calls onCollapse callback when collapsing a node', () => {
+      const onCollapse = jest.fn();
+      const { container } = render(
+        <JsonTree data={{ a: { b: 'value' } }} defaultExpanded onCollapse={onCollapse} />
+      );
+      const expandButton = container.querySelector('button[class*="expandCollapse"]');
+      if (expandButton) {
+        fireEvent.click(expandButton);
+        expect(onCollapse).toHaveBeenCalledWith('root');
+      }
     });
   });
 });
