@@ -269,17 +269,21 @@ function renderJSONNode(
 
   const handleToggleExpanded = (e: React.MouseEvent) => {
     e.stopPropagation();
-    tree.toggleExpanded(node.value);
+
     if (expanded) {
       onCollapse?.(node.value);
     } else {
       onExpand?.(node.value);
     }
+
     if (onExpandedChange) {
-      // Build new state manually since tree.expandedState may not reflect
-      // the toggleExpanded call yet (React setState is async)
+      // In controlled mode, derive next state and let parent update via onExpandedChange.
+      // tree.toggleExpanded is not called — the useEffect will sync from the new prop.
       const newState = { ...tree.expandedState, [node.value]: !expanded };
       onExpandedChange(Object.keys(newState).filter((k) => newState[k]));
+    } else {
+      // In uncontrolled mode, mutate internal tree state directly
+      tree.toggleExpanded(node.value);
     }
   };
 
@@ -577,8 +581,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     [data, displayFunctions]
   );
 
-  // Calculate initial expanded state based on maxDepth
+  // Calculate initial expanded state — use controlled prop if provided
   const initialExpandedState = useMemo(() => {
+    if (controlledExpanded) {
+      const state: Record<string, boolean> = {};
+      controlledExpanded.forEach((path) => {
+        state[path] = true;
+      });
+      return state;
+    }
+
     if (defaultExpanded) {
       if (maxDepth === -1) {
         return getTreeExpandedState(treeData, '*');
@@ -597,7 +609,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
       return getTreeExpandedState(treeData, expandedNodes);
     }
     return {};
-  }, [treeData, defaultExpanded, maxDepth]);
+  }, [treeData, defaultExpanded, maxDepth, controlledExpanded]);
 
   const tree = useTree({
     initialExpandedState,
@@ -618,6 +630,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'c' && withCopyToClipboard) {
+        e.preventDefault();
         const focused = (e.currentTarget as HTMLElement).querySelector(
           '[data-value][tabindex="0"], [data-value]:focus'
         );
@@ -679,10 +692,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
                   size="xs"
                   variant="transparent"
                   onClick={() => {
-                    tree.expandAllNodes();
+                    const allState = getTreeExpandedState(treeData, '*');
                     if (onExpandedChange) {
-                      const allState = getTreeExpandedState(treeData, '*');
                       onExpandedChange(Object.keys(allState).filter((k) => allState[k]));
+                    } else {
+                      tree.expandAllNodes();
                     }
                   }}
                   {...getStyles('controls')}
@@ -694,8 +708,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
                   size="xs"
                   variant="transparent"
                   onClick={() => {
-                    tree.collapseAllNodes();
-                    onExpandedChange?.([]);
+                    if (onExpandedChange) {
+                      onExpandedChange([]);
+                    } else {
+                      tree.collapseAllNodes();
+                    }
                   }}
                   {...getStyles('controls')}
                 >
