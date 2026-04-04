@@ -10,6 +10,12 @@ describe('JsonTree', () => {
     expect(container).toBeTruthy();
   });
 
+  it('forwards ref', () => {
+    const ref = React.createRef<HTMLDivElement>();
+    render(<JsonTree data={[]} ref={ref} />);
+    expect(ref.current).toBeInstanceOf(HTMLDivElement);
+  });
+
   describe('displayFunctions prop', () => {
     const dataWithFunctions = {
       name: 'Test',
