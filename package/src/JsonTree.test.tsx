@@ -286,22 +286,19 @@ describe('JsonTree', () => {
           onExpandedChange={onExpandedChange}
         />
       );
-      // Find the expand/collapse button and click it
       const expandButton = container.querySelector('button[class*="expandCollapse"]');
-      if (expandButton) {
-        fireEvent.click(expandButton);
-        expect(onExpandedChange).toHaveBeenCalled();
-      }
+      expect(expandButton).toBeTruthy();
+      fireEvent.click(expandButton!);
+      expect(onExpandedChange).toHaveBeenCalled();
     });
 
     it('calls onExpand callback when expanding a node', () => {
       const onExpand = jest.fn();
       const { container } = render(<JsonTree data={{ a: { b: 'value' } }} onExpand={onExpand} />);
       const expandButton = container.querySelector('button[class*="expandCollapse"]');
-      if (expandButton) {
-        fireEvent.click(expandButton);
-        expect(onExpand).toHaveBeenCalledWith('root');
-      }
+      expect(expandButton).toBeTruthy();
+      fireEvent.click(expandButton!);
+      expect(onExpand).toHaveBeenCalledWith('root');
     });
 
     it('calls onCollapse callback when collapsing a node', () => {
@@ -310,10 +307,9 @@ describe('JsonTree', () => {
         <JsonTree data={{ a: { b: 'value' } }} defaultExpanded onCollapse={onCollapse} />
       );
       const expandButton = container.querySelector('button[class*="expandCollapse"]');
-      if (expandButton) {
-        fireEvent.click(expandButton);
-        expect(onCollapse).toHaveBeenCalledWith('root');
-      }
+      expect(expandButton).toBeTruthy();
+      fireEvent.click(expandButton!);
+      expect(onCollapse).toHaveBeenCalledWith('root');
     });
   });
 });
