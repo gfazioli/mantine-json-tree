@@ -518,7 +518,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
   }
 );
 
-export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
+export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const props = useProps('JsonTree', defaultProps, _props);
 
   const {
@@ -599,7 +599,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
       const expandedNodes: string[] = [];
       const traverse = (nodes: JSONTreeNodeData[], depth: number) => {
         nodes.forEach((node) => {
-          if (depth < maxDepth && node.children) {
+          if (depth < (maxDepth ?? Infinity) && node.children) {
             expandedNodes.push(node.value);
             traverse(node.children as JSONTreeNodeData[], depth + 1);
           }
@@ -677,7 +677,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props, ref) => {
     <>
       <JsonTreeMediaVariables size={size} selector={`.${responsiveClassName}`} />
       <Box
-        ref={ref}
         {...getStyles('root', { className: responsiveClassName })}
         {...others}
         data-line-numbers={showLineNumbers || undefined}

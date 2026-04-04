@@ -257,8 +257,8 @@ export function convertToTreeData(
   if (type === 'array') {
     entries = value.map((item: any, index: number) => [String(index), item] as [string, any]);
   } else if (type === 'map') {
-    entries = Array.from(value.entries()).map(
-      ([k, v], index) => [`[${index}] ${String(k)}`, v] as [string, any]
+    entries = Array.from(value.entries() as Iterable<[any, any]>).map(
+      ([k, v]: [any, any], index: number) => [`[${index}] ${String(k)}`, v] as [string, any]
     );
   } else if (type === 'set') {
     entries = Array.from(value.values()).map(
