@@ -52,14 +52,14 @@ const data = {
 };
 
 export function UsageProps(props: JsonTreeProps) {
-  return <JsonTree data={data} {...props} />;
+  return <JsonTree {...props} data={data} />;
 }
 
 export function WrapScrollAreaProps(props: JsonTreeProps) {
   return (
     <Stack style={{ border: '1px solid red' }} pos="relative">
       <ScrollArea style={{ height: 200 }} type="scroll">
-        <JsonTree data={data} {...props} />
+        <JsonTree {...props} data={data} />
       </ScrollArea>
     </Stack>
   );

@@ -10,13 +10,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---------|---------|
 | `yarn build` | Build the npm package via Rollup |
 | `yarn dev` | Start the Next.js docs dev server (port 9281) |
-| `yarn test` | Full test suite (syncpack + prettier + typecheck + lint + jest) |
+| `yarn test` | Full test suite (syncpack + oxfmt + typecheck + lint + jest) |
 | `yarn jest` | Run only Jest unit tests |
 | `yarn docgen` | Generate component API docs (docgen.json) |
 | `yarn docs:build` | Build the Next.js docs site for production |
 | `yarn docs:deploy` | Build and deploy docs to GitHub Pages |
-| `yarn lint` | Run ESLint + Stylelint |
-| `yarn prettier:write` | Format all files with Prettier |
+| `yarn lint` | Run oxlint + Stylelint |
+| `yarn format:write` | Format all files with oxfmt |
 | `yarn storybook` | Start Storybook dev server |
 | `yarn clean` | Remove build artifacts |
 | `yarn release:patch` | Bump patch version and deploy docs |
@@ -93,7 +93,7 @@ When `stickyHeader` is true, the header gets `position: sticky` via `[data-stick
 Jest with `jsdom` environment, `esbuild-jest` transform, CSS mocked via `identity-obj-proxy`. Component tests use `@mantine-tests/core` render helper. Test file: `package/src/JsonTree.test.tsx`.
 
 ## Ecosystem
-This repo is part of the Mantine Extensions ecosystem, derived from the `mantine-base-component` template. See the workspace CLAUDE.md at `/Users/giovambattistafazioli/Lavoro/GitHub/Mantine Extensions/CLAUDE.md` for:
+This repo is part of the Mantine Extensions ecosystem, derived from the `mantine-base-component` template. See the workspace `CLAUDE.md` (in the parent directory) for:
 - Development checklist (code -> test -> build -> docs -> release)
 - Cross-cutting patterns (compound components, responsive CSS, GitHub sync)
 - Update packages workflow
