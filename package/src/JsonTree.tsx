@@ -624,7 +624,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       });
       tree.setExpandedState(state);
     }
-  }, [controlledExpanded, tree.setExpandedState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tree.setExpandedState changes on every render; using tree would cause infinite loop
+  }, [controlledExpanded]);
 
   // Keyboard handler for Ctrl+C copy on focused node
   const handleKeyDown = useCallback(
