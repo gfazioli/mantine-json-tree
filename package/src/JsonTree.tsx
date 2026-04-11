@@ -434,8 +434,12 @@ function renderJSONNode(
         wrap="nowrap"
         {...elementProps}
         onClick={handleClick}
-        data-search-match={ctx.matchedPaths?.has(node.value) ? true : undefined}
-        style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+        style={{
+          cursor: onNodeClick ? 'pointer' : 'default',
+          position: 'relative',
+          opacity: ctx.searchQuery ? (ctx.matchedPaths?.has(node.value) ? 1 : 0.25) : undefined,
+          transition: 'opacity 0.15s ease',
+        }}
       >
         {lineNumber}
         {renderIndentGuides()}
@@ -517,8 +521,12 @@ function renderJSONNode(
       data-expanded={expanded}
       data-has-children={hasChildren}
       data-type={type}
-      data-search-match={ctx.matchedPaths?.has(node.value) ? true : undefined}
-      style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
+      style={{
+        cursor: onNodeClick ? 'pointer' : 'default',
+        position: 'relative',
+        opacity: ctx.searchQuery ? (ctx.matchedPaths?.has(node.value) ? 1 : 0.25) : undefined,
+        transition: 'opacity 0.15s ease',
+      }}
     >
       {lineNumber}
       {renderIndentGuides()}
