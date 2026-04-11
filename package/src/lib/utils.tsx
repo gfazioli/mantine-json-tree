@@ -281,6 +281,80 @@ export function convertToTreeData(
 }
 
 /**
+ * Result of a search operation on the JSON tree.
+ */
+export interface SearchResult {
+  /** Set of node paths that match the search query */
+  matchedPaths: Set<string>;
+  /** Array of ancestor paths that must be expanded to reveal matches */
+  expandedPaths: string[];
+}
+
+/**
+ * Search the tree data for nodes matching a query string.
+ * Matches against key names and formatted values (case-insensitive).
+ */
+export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResult {
+  const matchedPaths = new Set<string>();
+  const expandedPaths = new Set<string>();
+
+  if (!query.trim()) {
+    return { matchedPaths, expandedPaths: [] };
+  }
+
+  const lowerQuery = query.toLowerCase();
+
+  function traverse(node: JSONTreeNodeData, ancestors: string[]): boolean {
+    const nd = node.nodeData;
+    let matches = false;
+
+    if (nd) {
+      // Match key name
+      if (nd.key !== undefined && String(nd.key).toLowerCase().includes(lowerQuery)) {
+        matches = true;
+      }
+      // Match formatted value (for primitives)
+      if (!matches && nd.type && nd.value !== undefined && !isExpandable(nd.value)) {
+        const formatted = formatValue(nd.value, nd.type);
+        if (formatted.toLowerCase().includes(lowerQuery)) {
+          matches = true;
+        }
+      }
+    }
+
+    // Recurse into children
+    let childMatches = false;
+    if (node.children) {
+      for (const child of node.children as JSONTreeNodeData[]) {
+        if (traverse(child, [...ancestors, node.value])) {
+          childMatches = true;
+        }
+      }
+    }
+
+    if (matches || childMatches) {
+      if (nd?.path) {
+        matchedPaths.add(nd.path);
+      }
+      matchedPaths.add(node.value);
+      ancestors.forEach((a) => expandedPaths.add(a));
+      if (node.children) {
+        expandedPaths.add(node.value);
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  for (const node of nodes) {
+    traverse(node, []);
+  }
+
+  return { matchedPaths, expandedPaths: Array.from(expandedPaths) };
+}
+
+/**
  * Find a node in the tree by its path value.
  */
 export function findNodeByPath(
