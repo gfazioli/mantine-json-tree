@@ -226,15 +226,6 @@
   display: block;
 }
 
-.root[data-searching] :global([role='treeitem']) {
-  opacity: 0.3;
-  transition: opacity 0.15s ease;
-}
-
-.root[data-searching] :global([role='treeitem'][data-search-match]) {
-  opacity: 1;
-}
-
 .searchHighlight {
   background-color: var(--json-tree-search-highlight-color, rgba(251, 191, 36, 0.4));
   border-radius: 2px;
