@@ -25,7 +25,11 @@ export const configurator: MantineDemo = {
   controls: [
     { type: 'string', prop: 'title', initialValue: undefined as any, libraryValue: null },
     { type: 'size', prop: 'size', initialValue: 'sm', libraryValue: 'xs' },
-    { type: 'boolean', prop: 'withExpandAll', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'withBorder', initialValue: true, libraryValue: false },
+    { type: 'boolean', prop: 'withKeyCountBadge', initialValue: true, libraryValue: false },
+    { type: 'boolean', prop: 'withExpandAll', initialValue: true, libraryValue: false },
+    { type: 'boolean', prop: 'withCopyAll', initialValue: true, libraryValue: false },
+    { type: 'boolean', prop: 'withSearch', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'withCopyToClipboard', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'showIndentGuides', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'showItemsCount', initialValue: true, libraryValue: false },
