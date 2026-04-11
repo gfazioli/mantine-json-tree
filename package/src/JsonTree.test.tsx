@@ -386,5 +386,36 @@ describe('JsonTree', () => {
       const header = container.querySelector('[class*="header"]');
       expect(header).toBeTruthy();
     });
+
+    it('opens search bar when search toggle is clicked', () => {
+      const { container } = render(
+        <JsonTree data={{ a: 1, b: 'hello' }} title="Test" withSearch />
+      );
+      const searchToggle = container.querySelector('.mantine-ActionIcon-root');
+      expect(searchToggle).toBeTruthy();
+      fireEvent.click(searchToggle!);
+      const input = container.querySelector('input[placeholder]');
+      expect(input).toBeTruthy();
+    });
+
+    it('renders with all toolbar features without crashing', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ a: 1, b: { c: 'test' } }}
+          title="Full Toolbar"
+          withBorder
+          withKeyCountBadge
+          withExpandAll
+          withCopyAll
+          withSearch
+          defaultExpanded
+        />
+      );
+      expect(container).toBeTruthy();
+      const paper = container.querySelector('.mantine-Paper-root');
+      expect(paper).toBeTruthy();
+      const badge = container.querySelector('.mantine-Badge-root');
+      expect(badge).toBeTruthy();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconArrowBarToDown,
   IconArrowBarToUp,
@@ -37,6 +37,7 @@ import {
   type StyleProp,
   type TooltipProps,
 } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import {
   convertToTreeData,
@@ -44,6 +45,7 @@ import {
   formatValue,
   getItemCount,
   isExpandable,
+  searchTree,
   type JSONTreeNodeData,
   type ValueType,
 } from './lib/utils';
@@ -226,6 +228,15 @@ export interface JsonTreeBaseProps {
 
   /** Placeholder text for the search input @default 'Filter keys and values...' */
   searchPlaceholder?: string;
+
+  /** Controlled search query value */
+  searchQuery?: string;
+
+  /** Callback when search query changes */
+  onSearchChange?: (query: string) => void;
+
+  /** Debounce delay for search in ms @default 300 */
+  searchDebounce?: number;
 }
 
 /** Display mode for functions in JSON data */
@@ -263,6 +274,7 @@ export const defaultProps: Partial<JsonTreeProps> = {
   copyAllIcon: <IconCopy size={16} />,
   searchIcon: <IconSearch size={16} />,
   searchPlaceholder: 'Filter keys and values...',
+  searchDebounce: 300,
 };
 
 interface RenderNodeContext {
@@ -273,6 +285,32 @@ interface RenderNodeContext {
   onExpand?: (path: string) => void;
   onCollapse?: (path: string) => void;
   onExpandedChange?: (expanded: string[]) => void;
+  searchQuery?: string;
+  matchedPaths?: Set<string>;
+}
+
+function highlightText(
+  text: string,
+  query: string,
+  getStyles: RenderNodeContext['getStyles']
+): React.ReactNode {
+  if (!query) {
+    return text;
+  }
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const idx = lowerText.indexOf(lowerQuery);
+  if (idx === -1) {
+    return text;
+  }
+
+  return (
+    <>
+      {text.substring(0, idx)}
+      <mark {...getStyles('searchHighlight')}>{text.substring(idx, idx + query.length)}</mark>
+      {text.substring(idx + query.length)}
+    </>
+  );
 }
 
 function renderJSONNode(
@@ -396,6 +434,7 @@ function renderJSONNode(
         wrap="nowrap"
         {...elementProps}
         onClick={handleClick}
+        data-search-match={ctx.matchedPaths?.has(node.value) ? true : undefined}
         style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
       >
         {lineNumber}
@@ -403,7 +442,7 @@ function renderJSONNode(
         {key !== undefined && (
           <>
             <Text component="span" {...getStyles('key')} data-key={key}>
-              {key}
+              {ctx.searchQuery ? highlightText(String(key), ctx.searchQuery, getStyles) : key}
             </Text>
             <Text component="span" {...getStyles('keyValueSeparator')}>
               :
@@ -414,7 +453,9 @@ function renderJSONNode(
           const formattedValue = formatValue(value, type);
           return (
             <Code {...getStyles('value')} data-type={type} data-value={formattedValue}>
-              {formattedValue}
+              {ctx.searchQuery
+                ? highlightText(formattedValue, ctx.searchQuery, getStyles)
+                : formattedValue}
             </Code>
           );
         })()}
@@ -476,6 +517,7 @@ function renderJSONNode(
       data-expanded={expanded}
       data-has-children={hasChildren}
       data-type={type}
+      data-search-match={ctx.matchedPaths?.has(node.value) ? true : undefined}
       style={{ cursor: onNodeClick ? 'pointer' : 'default', position: 'relative' }}
     >
       {lineNumber}
@@ -492,7 +534,7 @@ function renderJSONNode(
       {key !== undefined && (
         <>
           <Text component="span" {...getStyles('key')}>
-            {key}
+            {ctx.searchQuery ? highlightText(String(key), ctx.searchQuery, getStyles) : key}
           </Text>
           <Text component="span" {...getStyles('keyValueSeparator')}>
             :
@@ -635,6 +677,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     withSearch,
     searchIcon,
     searchPlaceholder,
+    searchQuery: controlledSearchQuery,
+    onSearchChange,
+    searchDebounce,
 
     classNames,
     style,
@@ -744,9 +789,59 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Key count for badge
   const totalKeyCount = useMemo(() => getItemCount(data), [data]);
 
-  // Search state (toggle only for Phase 1 — full search in Phase 2)
-  const [searchOpen, setSearchOpen] = React.useState(false);
-  const [searchQueryInternal, setSearchQueryInternal] = React.useState('');
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQueryInternal, setSearchQueryInternal] = useState('');
+  const activeSearchQuery = controlledSearchQuery ?? searchQueryInternal;
+  const [debouncedQuery] = useDebouncedValue(activeSearchQuery, searchDebounce ?? 300);
+
+  // Save pre-search expanded state for restore
+  const preSearchExpandedRef = useRef<Record<string, boolean> | null>(null);
+
+  // Search results
+  const searchResults = useMemo(
+    () => searchTree(treeData, debouncedQuery),
+    [treeData, debouncedQuery]
+  );
+
+  // Auto-expand to show search results
+  useEffect(() => {
+    if (debouncedQuery && searchResults.expandedPaths.length > 0) {
+      if (!preSearchExpandedRef.current) {
+        preSearchExpandedRef.current = { ...tree.expandedState };
+      }
+      const newState: Record<string, boolean> = {};
+      searchResults.expandedPaths.forEach((p: string) => {
+        newState[p] = true;
+      });
+      if (onExpandedChange) {
+        onExpandedChange(Object.keys(newState).filter((k) => newState[k]));
+      } else {
+        tree.setExpandedState(newState);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, searchResults]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQueryInternal('');
+    onSearchChange?.('');
+    if (preSearchExpandedRef.current) {
+      if (onExpandedChange) {
+        onExpandedChange(
+          Object.keys(preSearchExpandedRef.current).filter((k) => preSearchExpandedRef.current![k])
+        );
+      } else {
+        tree.setExpandedState(preSearchExpandedRef.current);
+      }
+      preSearchExpandedRef.current = null;
+    }
+  }, [onExpandedChange, onSearchChange, tree]);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOpen(false);
+    handleClearSearch();
+  }, [handleClearSearch]);
 
   // Named handlers for expand/collapse all
   const handleExpandAll = useCallback(() => {
@@ -786,6 +881,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     onExpand,
     onCollapse,
     onExpandedChange,
+    searchQuery: debouncedQuery || undefined,
+    matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
   };
 
   const treeComponent = (
@@ -806,6 +903,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         {...getStyles('root', { className: responsiveClassName })}
         {...others}
         data-line-numbers={showLineNumbers || undefined}
+        data-searching={debouncedQuery ? true : undefined}
         onKeyDown={handleKeyDown}
       >
         {showHeader && (
@@ -827,7 +925,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   size="sm"
                   variant={searchOpen ? 'light' : 'subtle'}
                   color="gray"
-                  onClick={() => setSearchOpen((v) => !v)}
+                  onClick={() => {
+                    if (searchOpen) {
+                      handleCloseSearch();
+                    } else {
+                      setSearchOpen(true);
+                    }
+                  }}
                   {...getStyles('searchToggle')}
                 >
                   {searchIcon}
@@ -878,13 +982,15 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
             <Box {...getStyles('searchBar')} p="xs">
               <TextInput
                 placeholder={searchPlaceholder}
-                value={searchQueryInternal}
-                onChange={(e) => setSearchQueryInternal(e.currentTarget.value)}
+                value={activeSearchQuery}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setSearchQueryInternal(val);
+                  onSearchChange?.(val);
+                }}
                 leftSection={<IconSearch size={14} />}
                 rightSection={
-                  searchQueryInternal ? (
-                    <CloseButton size="sm" onClick={() => setSearchQueryInternal('')} />
-                  ) : null
+                  activeSearchQuery ? <CloseButton size="sm" onClick={handleClearSearch} /> : null
                 }
                 size="sm"
                 {...getStyles('searchInput')}
