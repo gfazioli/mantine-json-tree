@@ -446,7 +446,6 @@ export function WithSearch() {
       withExpandAll
       withKeyCountBadge
       withCopyAll
-      defaultExpanded
     />
   );
 }

@@ -236,8 +236,12 @@
 }
 
 .searchHighlight {
-  background-color: var(--json-tree-search-highlight-color, var(--mantine-color-yellow-3));
+  background-color: var(--json-tree-search-highlight-color, rgba(251, 191, 36, 0.4));
   border-radius: 2px;
-  padding: 0 1px;
+  padding: 0 2px;
   color: inherit;
+
+  @mixin where-dark {
+    background-color: var(--json-tree-search-highlight-color, rgba(251, 191, 36, 0.3));
+  }
 }
