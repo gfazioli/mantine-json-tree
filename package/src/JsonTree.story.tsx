@@ -379,3 +379,74 @@ export function SpecialValueTypes() {
     </Stack>
   );
 }
+
+export function ToolbarFull() {
+  return (
+    <JsonTree
+      data={data}
+      title="API Response"
+      withBorder
+      withKeyCountBadge
+      withExpandAll
+      withCopyAll
+      withSearch
+      withCopyToClipboard
+      showIndentGuides
+      defaultExpanded
+    />
+  );
+}
+
+export function WithBorder() {
+  return (
+    <Stack>
+      <JsonTree data={data} title="With Border" withBorder withExpandAll withKeyCountBadge />
+      <JsonTree data={data} title="Without Border" withExpandAll withKeyCountBadge />
+    </Stack>
+  );
+}
+
+export function WithKeyCountBadge() {
+  return (
+    <Stack>
+      <JsonTree data={data} title="Object" withKeyCountBadge withBorder />
+      <JsonTree data={[1, 2, 3, 4, 5]} title="Array" withKeyCountBadge withBorder />
+      <JsonTree
+        data={data}
+        title="Custom Label"
+        withKeyCountBadge
+        keyCountBadgeLabel={(count) => `${count} properties`}
+        withBorder
+      />
+    </Stack>
+  );
+}
+
+export function WithCopyAll() {
+  return (
+    <JsonTree
+      data={data}
+      title="Copy All Demo"
+      withBorder
+      withCopyAll
+      withExpandAll
+      defaultExpanded
+      onCopyAll={(json) => console.log('Copied:', json.length, 'chars')}
+    />
+  );
+}
+
+export function WithSearch() {
+  return (
+    <JsonTree
+      data={data}
+      title="Search Demo"
+      withBorder
+      withSearch
+      withExpandAll
+      withKeyCountBadge
+      withCopyAll
+      defaultExpanded
+    />
+  );
+}

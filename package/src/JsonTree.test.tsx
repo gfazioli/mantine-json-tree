@@ -318,4 +318,73 @@ describe('JsonTree', () => {
       expect(onCollapse).toHaveBeenCalledWith('root');
     });
   });
+
+  describe('toolbar upgrade', () => {
+    it('renders Paper wrapper when withBorder is true', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} withBorder />);
+      const paper = container.querySelector('.mantine-Paper-root');
+      expect(paper).toBeTruthy();
+    });
+
+    it('does not render Paper wrapper when withBorder is false', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} />);
+      const paper = container.querySelector('.mantine-Paper-root');
+      expect(paper).toBeNull();
+    });
+
+    it('renders key count badge when withKeyCountBadge is true', () => {
+      const { container } = render(
+        <JsonTree data={{ a: 1, b: 2, c: 3 }} title="Test" withKeyCountBadge />
+      );
+      const badge = container.querySelector('.mantine-Badge-root');
+      expect(badge).toBeTruthy();
+      expect(badge?.textContent).toContain('3');
+    });
+
+    it('shows items for arrays in key count badge', () => {
+      const { container } = render(
+        <JsonTree data={[1, 2, 3, 4, 5]} title="Test" withKeyCountBadge />
+      );
+      const badge = container.querySelector('.mantine-Badge-root');
+      expect(badge?.textContent).toContain('5');
+      expect(badge?.textContent).toContain('items');
+    });
+
+    it('uses custom keyCountBadgeLabel', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ a: 1, b: 2 }}
+          title="Test"
+          withKeyCountBadge
+          keyCountBadgeLabel={(count) => `${count} properties`}
+        />
+      );
+      const badge = container.querySelector('.mantine-Badge-root');
+      expect(badge?.textContent).toContain('2 properties');
+    });
+
+    it('does not show badge for primitives', () => {
+      const { container } = render(<JsonTree data="hello" title="Test" withKeyCountBadge />);
+      const badge = container.querySelector('.mantine-Badge-root');
+      expect(badge).toBeNull();
+    });
+
+    it('renders copy all button when withCopyAll is true', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} title="Test" withCopyAll />);
+      const buttons = container.querySelectorAll('.mantine-ActionIcon-root');
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it('renders search toggle when withSearch is true', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} title="Test" withSearch />);
+      const buttons = container.querySelectorAll('.mantine-ActionIcon-root');
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it('shows header when any toolbar prop is set', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} withCopyAll />);
+      const header = container.querySelector('[class*="header"]');
+      expect(header).toBeTruthy();
+    });
+  });
 });
