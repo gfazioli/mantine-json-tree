@@ -307,7 +307,7 @@ function highlightText(
   return (
     <>
       {text.substring(0, idx)}
-      <mark {...getStyles('searchHighlight')}>{text.substring(idx, idx + query.length)}</mark>
+      <span {...getStyles('searchHighlight')}>{text.substring(idx, idx + query.length)}</span>
       {text.substring(idx + query.length)}
     </>
   );
