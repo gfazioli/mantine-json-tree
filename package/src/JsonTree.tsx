@@ -1,18 +1,29 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { IconChevronRight, IconCopy, IconLibraryMinus, IconLibraryPlus } from '@tabler/icons-react';
+import {
+  IconArrowBarToDown,
+  IconArrowBarToUp,
+  IconChevronRight,
+  IconCopy,
+  IconSearch,
+} from '@tabler/icons-react';
 import {
   ActionIcon,
   Badge,
   Box,
+  CloseButton,
   Code,
+  Divider,
   createVarsResolver,
   Factory,
   factory,
   getTreeExpandedState,
   Group,
+  MantineRadius,
   MantineSize,
+  Paper,
   rem,
   ScrollArea,
+  TextInput,
   StylesApiProps,
   Text,
   Tooltip,
@@ -31,6 +42,7 @@ import {
   convertToTreeData,
   findNodeByPath,
   formatValue,
+  getItemCount,
   isExpandable,
   type JSONTreeNodeData,
   type ValueType,
@@ -39,9 +51,17 @@ import classes from './JsonTree.module.css';
 
 export type JsonTreeStylesNames =
   | 'root'
+  | 'paper'
   | 'header'
+  | 'toolbar'
   | 'controls'
   | 'expandCollapse'
+  | 'keyCountBadge'
+  | 'copyAllButton'
+  | 'searchToggle'
+  | 'searchBar'
+  | 'searchInput'
+  | 'searchHighlight'
   | 'key'
   | 'keyValueSeparator'
   | 'value'
@@ -85,6 +105,14 @@ export type JsonTreeCssVariables = {
   controls: never;
   keyValueSeparator: never;
   copyButton: never;
+  paper: never;
+  toolbar: never;
+  keyCountBadge: never;
+  copyAllButton: never;
+  searchToggle: never;
+  searchBar: never;
+  searchInput: never;
+  searchHighlight: '--json-tree-search-highlight-color';
 };
 
 export interface JsonTreeBaseProps {
@@ -168,6 +196,36 @@ export interface JsonTreeBaseProps {
 
   /** How to display functions in the JSON data @default 'as-string' */
   displayFunctions?: JsonTreeFunctionDisplay;
+
+  /** Whether to wrap the component in a Paper with a border @default false */
+  withBorder?: boolean;
+
+  /** Paper radius when withBorder is enabled @default 'sm' */
+  borderRadius?: MantineRadius;
+
+  /** Whether to show a badge with the total key/item count next to the title @default false */
+  withKeyCountBadge?: boolean;
+
+  /** Custom label for the key count badge. Receives count, returns string. */
+  keyCountBadgeLabel?: (count: number) => string;
+
+  /** Whether to show a global copy-to-clipboard button in the toolbar @default false */
+  withCopyAll?: boolean;
+
+  /** Icon for the global copy-to-clipboard button */
+  copyAllIcon?: React.ReactNode;
+
+  /** Callback when the entire JSON is copied to clipboard */
+  onCopyAll?: (json: string) => void;
+
+  /** Whether to show the search toggle button in the toolbar @default false */
+  withSearch?: boolean;
+
+  /** Icon for the search toggle button */
+  searchIcon?: React.ReactNode;
+
+  /** Placeholder text for the search input @default 'Filter keys and values...' */
+  searchPlaceholder?: string;
 }
 
 /** Display mode for functions in JSON data */
@@ -194,9 +252,17 @@ export const defaultProps: Partial<JsonTreeProps> = {
   showPathOnHover: false,
   stickyHeader: false,
   displayFunctions: 'as-string',
-  expandAllControlIcon: <IconLibraryPlus size={16} />,
-  collapseAllControlIcon: <IconLibraryMinus size={16} />,
+  expandAllControlIcon: <IconArrowBarToDown size={16} />,
+  collapseAllControlIcon: <IconArrowBarToUp size={16} />,
   copyToClipboardIcon: <IconCopy size={12} />,
+  withBorder: false,
+  borderRadius: 'sm',
+  withKeyCountBadge: false,
+  withCopyAll: false,
+  withSearch: false,
+  copyAllIcon: <IconCopy size={16} />,
+  searchIcon: <IconSearch size={16} />,
+  searchPlaceholder: 'Filter keys and values...',
 };
 
 interface RenderNodeContext {
@@ -514,6 +580,16 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       itemsCount: {},
       controls: {},
       copyButton: {},
+      paper: {},
+      toolbar: {},
+      keyCountBadge: {},
+      copyAllButton: {},
+      searchToggle: {},
+      searchBar: {},
+      searchInput: {},
+      searchHighlight: {
+        '--json-tree-search-highlight-color': 'var(--mantine-color-yellow-3)',
+      },
     };
   }
 );
@@ -549,6 +625,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     expandControlIcon,
     collapseControlIcon,
     size,
+    withBorder,
+    borderRadius,
+    withKeyCountBadge,
+    keyCountBadgeLabel,
+    withCopyAll,
+    copyAllIcon,
+    onCopyAll,
+    withSearch,
+    searchIcon,
+    searchPlaceholder,
 
     classNames,
     style,
@@ -655,6 +741,43 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     [withCopyToClipboard, treeData, onCopy]
   );
 
+  // Key count for badge
+  const totalKeyCount = useMemo(() => getItemCount(data), [data]);
+
+  // Search state (toggle only for Phase 1 — full search in Phase 2)
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [searchQueryInternal, setSearchQueryInternal] = React.useState('');
+
+  // Named handlers for expand/collapse all
+  const handleExpandAll = useCallback(() => {
+    const allState = getTreeExpandedState(treeData, '*');
+    if (onExpandedChange) {
+      onExpandedChange(Object.keys(allState).filter((k: string) => allState[k]));
+    } else {
+      tree.expandAllNodes();
+    }
+  }, [treeData, onExpandedChange, tree]);
+
+  const handleCollapseAll = useCallback(() => {
+    if (onExpandedChange) {
+      onExpandedChange([]);
+    } else {
+      tree.collapseAllNodes();
+    }
+  }, [onExpandedChange, tree]);
+
+  // Global copy handler
+  const handleCopyAll = useCallback(async () => {
+    try {
+      const json = JSON.stringify(data, null, 2);
+      await navigator.clipboard.writeText(json);
+      onCopyAll?.(json);
+      onCopy?.(json, data);
+    } catch {
+      // Clipboard write may fail silently
+    }
+  }, [data, onCopyAll, onCopy]);
+
   const renderCtx: RenderNodeContext = {
     getStyles,
     copyToClipboardIcon,
@@ -674,7 +797,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     />
   );
 
-  return (
+  const showHeader = title || withExpandAll || withKeyCountBadge || withCopyAll || withSearch;
+
+  const content = (
     <>
       <JsonTreeMediaVariables size={size} selector={`.${responsiveClassName}`} />
       <Box
@@ -683,45 +808,91 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         data-line-numbers={showLineNumbers || undefined}
         onKeyDown={handleKeyDown}
       >
-        {(title || withExpandAll) && (
+        {showHeader && (
           <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
-            {title || <div />}
-            {withExpandAll && isExpandable(data) && (
-              <Group gap="xs" style={{ top: 10, zIndex: 1 }}>
-                <ActionIcon
-                  size="xs"
-                  variant="transparent"
-                  onClick={() => {
-                    const allState = getTreeExpandedState(treeData, '*');
-                    if (onExpandedChange) {
-                      onExpandedChange(Object.keys(allState).filter((k) => allState[k]));
-                    } else {
-                      tree.expandAllNodes();
-                    }
-                  }}
-                  {...getStyles('controls')}
-                >
-                  {expandAllControlIcon}
-                </ActionIcon>
+            <Group gap="xs">
+              {title || <div />}
+              {withKeyCountBadge && isExpandable(data) && (
+                <Badge size="sm" variant="light" color="gray" {...getStyles('keyCountBadge')}>
+                  {keyCountBadgeLabel
+                    ? keyCountBadgeLabel(totalKeyCount)
+                    : `${totalKeyCount} ${Array.isArray(data) ? 'items' : 'keys'}`}
+                </Badge>
+              )}
+            </Group>
 
+            <Group gap={4} {...getStyles('toolbar')}>
+              {withSearch && (
                 <ActionIcon
-                  size="xs"
-                  variant="transparent"
-                  onClick={() => {
-                    if (onExpandedChange) {
-                      onExpandedChange([]);
-                    } else {
-                      tree.collapseAllNodes();
-                    }
-                  }}
-                  {...getStyles('controls')}
+                  size="sm"
+                  variant={searchOpen ? 'light' : 'subtle'}
+                  color="gray"
+                  onClick={() => setSearchOpen((v) => !v)}
+                  {...getStyles('searchToggle')}
                 >
-                  {collapseAllControlIcon}
+                  {searchIcon}
                 </ActionIcon>
-              </Group>
-            )}
+              )}
+
+              {withExpandAll && isExpandable(data) && (
+                <>
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={handleExpandAll}
+                    {...getStyles('controls')}
+                  >
+                    {expandAllControlIcon}
+                  </ActionIcon>
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={handleCollapseAll}
+                    {...getStyles('controls')}
+                  >
+                    {collapseAllControlIcon}
+                  </ActionIcon>
+                </>
+              )}
+
+              {withCopyAll && (
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color="gray"
+                  onClick={handleCopyAll}
+                  {...getStyles('copyAllButton')}
+                >
+                  {copyAllIcon}
+                </ActionIcon>
+              )}
+            </Group>
           </Group>
         )}
+
+        {searchOpen && withSearch && (
+          <>
+            <Divider />
+            <Box {...getStyles('searchBar')} p="xs">
+              <TextInput
+                placeholder={searchPlaceholder}
+                value={searchQueryInternal}
+                onChange={(e) => setSearchQueryInternal(e.currentTarget.value)}
+                leftSection={<IconSearch size={14} />}
+                rightSection={
+                  searchQueryInternal ? (
+                    <CloseButton size="sm" onClick={() => setSearchQueryInternal('')} />
+                  ) : null
+                }
+                size="sm"
+                {...getStyles('searchInput')}
+              />
+            </Box>
+          </>
+        )}
+
         {maxHeight ? (
           <ScrollArea.Autosize mah={maxHeight}>{treeComponent}</ScrollArea.Autosize>
         ) : (
@@ -730,6 +901,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       </Box>
     </>
   );
+
+  if (withBorder) {
+    return (
+      <Paper withBorder radius={borderRadius} {...getStyles('paper')}>
+        {content}
+      </Paper>
+    );
+  }
+
+  return content;
 });
 
 JsonTree.classes = classes;

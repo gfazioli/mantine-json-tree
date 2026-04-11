@@ -191,3 +191,44 @@
     background-color: var(--json-tree-indent-guide-color-4);
   }
 }
+
+.paper {
+  overflow: hidden;
+}
+
+.toolbar {
+  /* Styles API selector */
+  display: flex;
+}
+
+.keyCountBadge {
+  /* Styles API selector */
+  display: inline-flex;
+}
+
+.copyAllButton {
+  /* Styles API selector */
+  display: inline-flex;
+}
+
+.searchToggle {
+  /* Styles API selector */
+  display: inline-flex;
+}
+
+.searchBar {
+  /* Styles API selector */
+  display: block;
+}
+
+.searchInput {
+  /* Styles API selector */
+  display: block;
+}
+
+.searchHighlight {
+  background-color: var(--json-tree-search-highlight-color, var(--mantine-color-yellow-3));
+  border-radius: 2px;
+  padding: 0 1px;
+  color: inherit;
+}
