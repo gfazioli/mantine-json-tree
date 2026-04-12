@@ -811,7 +811,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQueryInternal, setSearchQueryInternal] = useState('');
-  const activeSearchQuery = controlledSearchQuery ?? searchQueryInternal;
+  const activeSearchQuery = controlledSearchQuery ?? searchQueryInternal ?? '';
   const [debouncedQuery] = useDebouncedValue(activeSearchQuery, searchDebounce ?? 300);
 
   // Save pre-search expanded state for restore

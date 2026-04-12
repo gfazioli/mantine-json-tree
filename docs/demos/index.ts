@@ -6,6 +6,8 @@ export { indentGuides } from './JsonTree.demo.indentGuides';
 export { lineNumbers } from './JsonTree.demo.lineNumbers';
 export { maxHeightDemo } from './JsonTree.demo.maxHeight';
 export { pathTooltip } from './JsonTree.demo.pathTooltip';
+export { rootName } from './JsonTree.demo.rootName';
+export { search } from './JsonTree.demo.search';
 export { specialTypes } from './JsonTree.demo.specialTypes';
 export { sticky } from './JsonTree.demo.sticky';
 export { styled } from './JsonTree.demo.styled';

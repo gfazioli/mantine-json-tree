@@ -3,6 +3,12 @@ import * as demos from './demos';
 
 ## What's new
 
+- **Search** with text highlight, auto-expand, and filtered tree view (`withSearch`)
+- **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
+- **Paper wrapper** with `withBorder` for bordered container look
+- **Root name** customization (`rootName` prop)
+- **Global copy** button to copy entire JSON to clipboard (`withCopyAll`)
+- **Key count badge** showing total keys/items next to title (`withKeyCountBadge`)
 - Dark mode support with automatic color adaptation
 - Line numbers display (`showLineNumbers`)
 - Path tooltip on hover (`showPathOnHover`)
@@ -11,7 +17,6 @@ import * as demos from './demos';
 - `onExpand` and `onCollapse` callbacks for individual node toggling
 - Keyboard copy: `Ctrl+C` / `Cmd+C` copies the focused node when `withCopyToClipboard` is enabled
 - Responsive `size` prop via Mantine breakpoint objects (CSS-native, no re-renders)
-- New `lineNumber` style selector with `--json-tree-color-line-number` CSS variable
 
 ## Installation
 
@@ -34,6 +39,26 @@ import '@gfazioli/mantine-json-tree/styles.layer.css';
 The `JsonTree` is interactive JSON tree viewer component built with [Mantine's Tree component](https://mantine.dev/core/tree/). Features collapsible nodes, syntax highlighting with type-specific colors, copy-to-clipboard functionality, item count badges, configurable expansion depth, and smooth animations. Perfect for debugging API responses, exploring complex data structures, and developer tools.
 
 <Demo data={demos.configurator} />
+
+## Search
+
+Enable `withSearch` to add a search toggle in the toolbar.
+When active, the tree filters to show only branches with
+matching keys or values. Direct matches get an amber
+background highlight, and the matching text portion is
+highlighted inline. Parent nodes are preserved for context.
+Clearing the search restores the previous expand state.
+
+<Demo data={demos.search} />
+
+## Root Name
+
+Use the `rootName` prop to customize the label of the
+root node. Defaults to `"root"`. This is useful for API
+responses, config files, or when displaying multiple
+trees with different root labels:
+
+<Demo data={demos.rootName} />
 
 ## Syntax Highlighting values
 

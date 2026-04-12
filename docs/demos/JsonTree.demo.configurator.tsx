@@ -23,7 +23,8 @@ export const configurator: MantineDemo = {
     { fileName: 'data.ts', code: dataCode, language: 'tsx' },
   ],
   controls: [
-    { type: 'string', prop: 'title', initialValue: undefined as any, libraryValue: null },
+    { type: 'string', prop: 'title', initialValue: 'My JSON', libraryValue: null },
+    { type: 'string', prop: 'rootName', initialValue: 'root', libraryValue: 'root' },
     { type: 'size', prop: 'size', initialValue: 'sm', libraryValue: 'xs' },
     { type: 'boolean', prop: 'withBorder', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'withKeyCountBadge', initialValue: true, libraryValue: false },
