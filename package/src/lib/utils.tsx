@@ -196,7 +196,7 @@ export function convertToTreeData(
   if (type === 'react-element') {
     return {
       value: path,
-      label: key || path,
+      label: key ?? path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -212,7 +212,7 @@ export function convertToTreeData(
   ) {
     return {
       value: path,
-      label: key || path,
+      label: key ?? path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -227,7 +227,7 @@ export function convertToTreeData(
       // Treat as primitive string value
       return {
         value: path,
-        label: key || path,
+        label: key ?? path,
         nodeData: { type, value, key, path, depth },
       };
     }
@@ -248,7 +248,7 @@ export function convertToTreeData(
   if (!expandable) {
     return {
       value: nodeValue,
-      label: key || path,
+      label: key ?? path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -274,7 +274,7 @@ export function convertToTreeData(
 
   return {
     value: nodeValue,
-    label: key || path,
+    label: key ?? path,
     children,
     nodeData: { type, value, key, path, itemCount: getItemCount(value), depth },
   };
