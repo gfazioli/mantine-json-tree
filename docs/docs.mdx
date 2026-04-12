@@ -51,12 +51,26 @@ Clearing the search restores the previous expand state.
 
 <Demo data={demos.search} />
 
+## Copy to Clipboard
+
+Both per-node and global copy buttons provide visual
+feedback — the icon briefly changes to a green
+checkmark after a successful copy.
+
+The **global copy** button (`withCopyAll`) copies the
+raw JSON data without the `rootName` wrapper. The
+`rootName` is a display-only label and is not included
+in the copied output. This makes the copied JSON
+directly usable in code and API tools.
+
 ## Root Name
 
 Use the `rootName` prop to customize the label of the
 root node. Defaults to `"root"`. This is useful for API
 responses, config files, or when displaying multiple
-trees with different root labels:
+trees with different root labels. Note that `rootName`
+is display-only — it does not affect the copied JSON
+output:
 
 <Demo data={demos.rootName} />
 

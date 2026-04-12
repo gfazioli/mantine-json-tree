@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconArrowBarToDown,
   IconArrowBarToUp,
+  IconCheck,
   IconChevronRight,
   IconCopy,
   IconSearch,
@@ -319,6 +320,34 @@ function highlightText(
   );
 }
 
+function CopyNodeButton({
+  icon,
+  getStyles,
+  onCopy,
+}: {
+  icon: React.ReactNode;
+  getStyles: RenderNodeContext['getStyles'];
+  onCopy: (e: React.MouseEvent) => Promise<void>;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleClick = async (e: React.MouseEvent) => {
+    await onCopy(e);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <ActionIcon
+      size="xs"
+      variant="subtle"
+      color={copied ? 'green' : 'gray'}
+      onClick={handleClick}
+      {...getStyles('copyButton')}
+    >
+      {copied ? <IconCheck size={12} /> : icon}
+    </ActionIcon>
+  );
+}
+
 function renderJSONNode(
   { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
   props: JsonTreeProps,
@@ -473,15 +502,7 @@ function renderJSONNode(
         })()}
 
         {withCopyToClipboard && (
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            color="gray"
-            onClick={handleCopy}
-            {...getStyles('copyButton')}
-          >
-            {copyToClipboardIcon}
-          </ActionIcon>
+          <CopyNodeButton icon={copyToClipboardIcon} getStyles={getStyles} onCopy={handleCopy} />
         )}
       </Group>
     );
@@ -888,13 +909,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
   }, [onExpandedChange, tree]);
 
-  // Global copy handler
+  // Global copy handler with visual feedback
+  const [copiedAll, setCopiedAll] = useState(false);
   const handleCopyAll = useCallback(async () => {
     try {
       const json = JSON.stringify(data, null, 2);
       await navigator.clipboard.writeText(json);
       onCopyAll?.(json);
       onCopy?.(json, data);
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1500);
     } catch {
       // Clipboard write may fail silently
     }
@@ -993,11 +1017,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                 <ActionIcon
                   size="sm"
                   variant="subtle"
-                  color="gray"
+                  color={copiedAll ? 'green' : 'gray'}
                   onClick={handleCopyAll}
                   {...getStyles('copyAllButton')}
                 >
-                  {copyAllIcon}
+                  {copiedAll ? <IconCheck size={16} /> : copyAllIcon}
                 </ActionIcon>
               )}
             </Group>
