@@ -449,3 +449,19 @@ export function WithSearch() {
     />
   );
 }
+
+export function WithRootName() {
+  return (
+    <Stack>
+      <JsonTree
+        data={data}
+        rootName="response"
+        title="Custom rootName"
+        withBorder
+        withKeyCountBadge
+        withExpandAll
+        defaultExpanded
+      />
+    </Stack>
+  );
+}
