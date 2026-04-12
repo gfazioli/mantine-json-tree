@@ -11,10 +11,16 @@ function Demo() {
   return (
     <JsonTree{{props}}
       title="demo.json"
+      rootName="data"
+      withBorder
+      withKeyCountBadge
+      withExpandAll
+      withCopyAll
+      withSearch
+      withCopyToClipboard
       showIndentGuides
       showItemsCount
-      withCopyToClipboard
-      withExpandAll
+      showLineNumbers
       defaultExpanded
       maxDepth={1}
       data={data}
@@ -27,10 +33,16 @@ function Demo(props: any) {
   return (
     <JsonTree
       title="demo.json"
+      rootName="data"
+      withBorder
+      withKeyCountBadge
+      withExpandAll
+      withCopyAll
+      withSearch
+      withCopyToClipboard
       showIndentGuides
       showItemsCount
-      withCopyToClipboard
-      withExpandAll
+      showLineNumbers
       defaultExpanded
       maxDepth={1}
       data={data}
