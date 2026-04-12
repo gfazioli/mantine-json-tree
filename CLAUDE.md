@@ -61,6 +61,12 @@ The component converts arbitrary data to Mantine's `TreeNodeData` format via `co
 
 The tree is rendered using Mantine's `<Tree>` component with a custom `renderNode` function (`renderJSONNode`) that produces two layouts: primitive values (key-value pair) and expandable nodes (with bracket notation and collapse/expand controls).
 
+### Toolbar
+The header/toolbar supports: `title`, `withKeyCountBadge` (shows "N keys" badge), `withExpandAll`, `withCopyAll` (global copy JSON), `withSearch` (search toggle). The `rootName` prop customizes the root node label (default "root"). `withBorder` wraps in Mantine `Paper`.
+
+### Search
+When `withSearch` is enabled, a search bar filters the tree to show only matching branches. `searchTree()` in `lib/utils.tsx` performs recursive case-insensitive matching on keys and values, returning `matchedPaths` (all visible nodes), `directMatches` (nodes with actual hits), and `expandedPaths`. `filterTreeBySearch()` prunes the tree to keep only matched branches. Direct matches get amber row background; text portions are highlighted with `<span>` + `searchHighlight` selector. Pre-search expand state is saved and restored on clear.
+
 ### Expansion control
 `defaultExpanded` + `maxDepth` props control initial state. `maxDepth: -1` expands all via `getTreeExpandedState(treeData, '*')`. Otherwise, a depth-limited traversal collects node values to expand. The `useTree` hook manages expand/collapse state.
 
@@ -78,7 +84,7 @@ The `varsResolver` maps props to CSS variables across multiple style targets:
 - **indentGuide**: 5 rotating color variables (`--json-tree-indent-guide-color-0` through `4`)
 
 ### Styles API selectors
-`root`, `header`, `controls`, `expandCollapse`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
+`root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
 
 ### Indent guides
 When `showIndentGuides` is enabled, absolutely-positioned `<div>` elements are rendered for each depth level with cycling colors (5-color palette via `data-color-index`). Guide position: `left = depth * 32 + 8px` (matching Mantine Tree's `levelOffset={32}`).
