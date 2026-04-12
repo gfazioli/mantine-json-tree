@@ -41,6 +41,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import {
   convertToTreeData,
+  filterTreeBySearch,
   findNodeByPath,
   formatValue,
   getItemCount,
@@ -120,6 +121,9 @@ export type JsonTreeCssVariables = {
 export interface JsonTreeBaseProps {
   /** The data to display (object, array, or any JSON-serializable value) */
   data: unknown;
+
+  /** Label for the root node @default 'root' */
+  rootName?: string;
 
   /** Whether nodes should be expanded by default @default false */
   defaultExpanded?: boolean;
@@ -253,6 +257,7 @@ export type JsonTreeFactory = Factory<{
 }>;
 
 export const defaultProps: Partial<JsonTreeProps> = {
+  rootName: 'root',
   defaultExpanded: false,
   maxDepth: 2,
   withExpandAll: false,
@@ -287,6 +292,7 @@ interface RenderNodeContext {
   onExpandedChange?: (expanded: string[]) => void;
   searchQuery?: string;
   matchedPaths?: Set<string>;
+  directMatches?: Set<string>;
 }
 
 function highlightText(
@@ -437,8 +443,10 @@ function renderJSONNode(
         style={{
           cursor: onNodeClick ? 'pointer' : 'default',
           position: 'relative',
-          opacity: ctx.searchQuery ? (ctx.matchedPaths?.has(node.value) ? 1 : 0.25) : undefined,
-          transition: 'opacity 0.15s ease',
+          backgroundColor: ctx.directMatches?.has(node.value)
+            ? 'rgba(251, 191, 36, 0.15)'
+            : undefined,
+          borderRadius: ctx.directMatches?.has(node.value) ? '4px' : undefined,
         }}
       >
         {lineNumber}
@@ -524,8 +532,10 @@ function renderJSONNode(
       style={{
         cursor: onNodeClick ? 'pointer' : 'default',
         position: 'relative',
-        opacity: ctx.searchQuery ? (ctx.matchedPaths?.has(node.value) ? 1 : 0.25) : undefined,
-        transition: 'opacity 0.15s ease',
+        backgroundColor: ctx.directMatches?.has(node.value)
+          ? 'rgba(251, 191, 36, 0.15)'
+          : undefined,
+        borderRadius: ctx.directMatches?.has(node.value) ? '4px' : undefined,
       }}
     >
       {lineNumber}
@@ -649,6 +659,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   const {
     data,
+    rootName,
     defaultExpanded,
     maxDepth,
     onNodeClick,
@@ -716,8 +727,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
-    () => [convertToTreeData(data, undefined, 'root', 0, displayFunctions)],
-    [data, displayFunctions]
+    () => [convertToTreeData(data, rootName ?? 'root', rootName ?? 'root', 0, displayFunctions)],
+    [data, rootName, displayFunctions]
   );
 
   // Calculate initial expanded state — use controlled prop if provided
@@ -812,6 +823,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     [treeData, debouncedQuery]
   );
 
+  // Filtered tree data for search (hide non-matching nodes)
+  const filteredTreeData = useMemo(() => {
+    if (!debouncedQuery || searchResults.matchedPaths.size === 0) {
+      return treeData;
+    }
+    return filterTreeBySearch(treeData, searchResults.matchedPaths);
+  }, [treeData, debouncedQuery, searchResults]);
+
   // Auto-expand to show search results
   useEffect(() => {
     if (debouncedQuery && searchResults.expandedPaths.length > 0) {
@@ -891,11 +910,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     onExpandedChange,
     searchQuery: debouncedQuery || undefined,
     matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
+    directMatches: debouncedQuery ? searchResults.directMatches : undefined,
   };
 
   const treeComponent = (
     <Tree
-      data={treeData}
+      data={filteredTreeData}
       tree={tree}
       levelOffset={32}
       renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}

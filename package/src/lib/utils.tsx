@@ -196,7 +196,7 @@ export function convertToTreeData(
   if (type === 'react-element') {
     return {
       value: path,
-      label: key || 'root',
+      label: key || path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -212,7 +212,7 @@ export function convertToTreeData(
   ) {
     return {
       value: path,
-      label: key || 'root',
+      label: key || path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -227,7 +227,7 @@ export function convertToTreeData(
       // Treat as primitive string value
       return {
         value: path,
-        label: key || 'root',
+        label: key || path,
         nodeData: { type, value, key, path, depth },
       };
     }
@@ -248,7 +248,7 @@ export function convertToTreeData(
   if (!expandable) {
     return {
       value: nodeValue,
-      label: key || 'root',
+      label: key || path,
       nodeData: { type, value, key, path, depth },
     };
   }
@@ -274,7 +274,7 @@ export function convertToTreeData(
 
   return {
     value: nodeValue,
-    label: key || 'root',
+    label: key || path,
     children,
     nodeData: { type, value, key, path, itemCount: getItemCount(value), depth },
   };
@@ -284,9 +284,11 @@ export function convertToTreeData(
  * Result of a search operation on the JSON tree.
  */
 export interface SearchResult {
-  /** Set of node paths that match the search query */
+  /** All paths to keep visible (direct matches + ancestors) */
   matchedPaths: Set<string>;
-  /** Array of ancestor paths that must be expanded to reveal matches */
+  /** Only paths where key or value directly matches the query (for row highlight) */
+  directMatches: Set<string>;
+  /** Ancestor paths that must be expanded to reveal matches */
   expandedPaths: string[];
 }
 
@@ -296,10 +298,11 @@ export interface SearchResult {
  */
 export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResult {
   const matchedPaths = new Set<string>();
+  const directMatches = new Set<string>();
   const expandedPaths = new Set<string>();
 
   if (!query.trim()) {
-    return { matchedPaths, expandedPaths: [] };
+    return { matchedPaths, directMatches, expandedPaths: [] };
   }
 
   const lowerQuery = query.toLowerCase();
@@ -309,11 +312,9 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
     let matches = false;
 
     if (nd) {
-      // Match key name
       if (nd.key !== undefined && String(nd.key).toLowerCase().includes(lowerQuery)) {
         matches = true;
       }
-      // Match formatted value (for primitives)
       if (!matches && nd.type && nd.value !== undefined && !isExpandable(nd.value)) {
         const formatted = formatValue(nd.value, nd.type);
         if (formatted.toLowerCase().includes(lowerQuery)) {
@@ -322,7 +323,6 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
       }
     }
 
-    // Recurse into children
     let childMatches = false;
     if (node.children) {
       for (const child of node.children as JSONTreeNodeData[]) {
@@ -333,11 +333,14 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
     }
 
     if (matches || childMatches) {
-      if (nd?.path) {
-        matchedPaths.add(nd.path);
-      }
       matchedPaths.add(node.value);
-      ancestors.forEach((a) => expandedPaths.add(a));
+      if (matches) {
+        directMatches.add(node.value);
+      }
+      ancestors.forEach((a) => {
+        matchedPaths.add(a);
+        expandedPaths.add(a);
+      });
       if (node.children) {
         expandedPaths.add(node.value);
       }
@@ -351,7 +354,28 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
     traverse(node, []);
   }
 
-  return { matchedPaths, expandedPaths: Array.from(expandedPaths) };
+  return { matchedPaths, directMatches, expandedPaths: Array.from(expandedPaths) };
+}
+
+/**
+ * Filter tree nodes to keep only those in matchedPaths (direct matches + ancestors).
+ */
+export function filterTreeBySearch(
+  nodes: JSONTreeNodeData[],
+  matchedPaths: Set<string>
+): JSONTreeNodeData[] {
+  return nodes.reduce((acc: JSONTreeNodeData[], node) => {
+    if (matchedPaths.has(node.value)) {
+      const filteredChildren = node.children
+        ? filterTreeBySearch(node.children as JSONTreeNodeData[], matchedPaths)
+        : undefined;
+      acc.push({
+        ...node,
+        children: filteredChildren && filteredChildren.length > 0 ? filteredChildren : undefined,
+      });
+    }
+    return acc;
+  }, []);
 }
 
 /**

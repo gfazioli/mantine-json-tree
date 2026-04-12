@@ -417,5 +417,15 @@ describe('JsonTree', () => {
       const badge = container.querySelector('.mantine-Badge-root');
       expect(badge).toBeTruthy();
     });
+
+    it('uses rootName as the root node label', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} rootName="myData" defaultExpanded />);
+      expect(container.textContent).toContain('myData');
+    });
+
+    it('defaults rootName to root', () => {
+      const { container } = render(<JsonTree data={{ a: 1 }} defaultExpanded />);
+      expect(container.textContent).toContain('root');
+    });
   });
 });
