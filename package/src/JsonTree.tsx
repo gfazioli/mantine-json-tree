@@ -327,14 +327,34 @@ function CopyNodeButton({
 }: {
   icon: React.ReactNode;
   getStyles: RenderNodeContext['getStyles'];
-  onCopy: (e: React.MouseEvent) => Promise<void>;
+  onCopy: (e: React.MouseEvent) => Promise<boolean>;
 }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleClick = async (e: React.MouseEvent) => {
-    await onCopy(e);
+    const success = await onCopy(e);
+    if (!success) {
+      return;
+    }
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      setCopied(false);
+      timeoutRef.current = null;
+    }, 1500);
   };
+
   return (
     <ActionIcon
       size="xs"
@@ -389,14 +409,15 @@ function renderJSONNode(
     tooltipProps,
   } = props;
 
-  const handleCopy = async (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent): Promise<boolean> => {
     e.stopPropagation();
     try {
       const copy = JSON.stringify(value, null, 2);
       await navigator.clipboard.writeText(copy);
       onCopy?.(copy, value);
-    } catch (error) {
-      // Clipboard write may fail silently in unsupported contexts
+      return true;
+    } catch {
+      return false;
     }
   };
 

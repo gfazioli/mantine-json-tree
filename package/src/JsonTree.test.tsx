@@ -428,4 +428,52 @@ describe('JsonTree', () => {
       expect(container.textContent).toContain('root');
     });
   });
+
+  describe('search utilities', () => {
+    it('searchTree finds matches by key name', () => {
+      const { searchTree } = require('./lib/utils');
+      const { convertToTreeData } = require('./lib/utils');
+      const treeData = [convertToTreeData({ name: 'Alice', age: 30 }, 'root', 'root', 0)];
+      const result = searchTree(treeData, 'name');
+      expect(result.directMatches.size).toBeGreaterThan(0);
+      expect(result.matchedPaths.size).toBeGreaterThan(0);
+    });
+
+    it('searchTree finds matches by value', () => {
+      const { searchTree, convertToTreeData } = require('./lib/utils');
+      const treeData = [convertToTreeData({ name: 'Alice', age: 30 }, 'root', 'root', 0)];
+      const result = searchTree(treeData, 'Alice');
+      expect(result.directMatches.size).toBeGreaterThan(0);
+    });
+
+    it('searchTree returns empty for empty query', () => {
+      const { searchTree, convertToTreeData } = require('./lib/utils');
+      const treeData = [convertToTreeData({ a: 1 }, 'root', 'root', 0)];
+      const result = searchTree(treeData, '');
+      expect(result.directMatches.size).toBe(0);
+      expect(result.matchedPaths.size).toBe(0);
+    });
+
+    it('filterTreeBySearch keeps only matching branches', () => {
+      const { filterTreeBySearch, searchTree, convertToTreeData } = require('./lib/utils');
+      const data = { a: { b: 'hello' }, c: { d: 'world' } };
+      const treeData = [convertToTreeData(data, 'root', 'root', 0)];
+      const { matchedPaths } = searchTree(treeData, 'hello');
+      const filtered = filterTreeBySearch(treeData, matchedPaths);
+      expect(filtered.length).toBe(1);
+      // root should still be there with only the 'a' branch
+      const rootChildren = filtered[0].children;
+      expect(rootChildren).toBeTruthy();
+      // 'c' branch should be filtered out
+      const hasC = rootChildren?.some((c: any) => c.nodeData?.key === 'c');
+      expect(hasC).toBeFalsy();
+    });
+
+    it('searchTree is case insensitive', () => {
+      const { searchTree, convertToTreeData } = require('./lib/utils');
+      const treeData = [convertToTreeData({ Name: 'ALICE' }, 'root', 'root', 0)];
+      const result = searchTree(treeData, 'alice');
+      expect(result.directMatches.size).toBeGreaterThan(0);
+    });
+  });
 });
