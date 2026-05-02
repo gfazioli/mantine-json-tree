@@ -415,17 +415,14 @@ describe('JsonTree', () => {
       expect(input).toBeTruthy();
     });
 
-    it('searchInputProps cannot override controlled value/onChange', () => {
+    it('searchInputProps cannot override controlled value/onChange at runtime', () => {
       const onChange = jest.fn();
       const { container } = render(
         <JsonTree
           data={{ a: 1 }}
           title="Test"
           withSearch
-          searchInputProps={{
-            value: 'should-be-ignored',
-            onChange,
-          }}
+          searchInputProps={{ value: 'should-be-ignored', onChange } as any}
         />
       );
       fireEvent.click(container.querySelector('.mantine-ActionIcon-root')!);

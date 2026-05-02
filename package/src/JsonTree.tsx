@@ -249,6 +249,10 @@ export interface JsonTreeBaseProps {
    * the search input via Mantine's native `classNames`, `styles`, `vars`, `variant`,
    * `radius`, `size`, etc. — no specificity workarounds required.
    *
+   * `value`, `defaultValue`, and `onChange` are intentionally excluded:
+   * `JsonTree` owns the search state. To control or observe it, use the
+   * top-level `searchQuery` and `onSearchChange` props.
+   *
    * @example
    * ```tsx
    * <JsonTree
@@ -259,7 +263,7 @@ export interface JsonTreeBaseProps {
    * />
    * ```
    */
-  searchInputProps?: TextInputProps;
+  searchInputProps?: Omit<TextInputProps, 'value' | 'defaultValue' | 'onChange'>;
 }
 
 /** Display mode for functions in JSON data */
@@ -1080,13 +1084,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   activeSearchQuery ? <CloseButton size="sm" onClick={handleClearSearch} /> : null
                 }
                 {...searchInputProps}
+                {...getStyles('searchInput', {
+                  className: searchInputProps?.className,
+                  style: searchInputProps?.style,
+                })}
                 value={activeSearchQuery}
                 onChange={(e) => {
                   const val = e.currentTarget.value;
                   setSearchQueryInternal(val);
                   onSearchChange?.(val);
                 }}
-                {...getStyles('searchInput')}
               />
             </Box>
           </>
