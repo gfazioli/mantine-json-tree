@@ -450,6 +450,30 @@ export function WithSearch() {
   );
 }
 
+export function WithSearchInputStyled() {
+  return (
+    <JsonTree
+      data={data}
+      title="Custom search input"
+      withBorder
+      withSearch
+      defaultExpanded
+      searchInputProps={{
+        radius: 'xl',
+        variant: 'filled',
+        placeholder: 'Look up keys or values…',
+        styles: {
+          input: {
+            backgroundColor: 'var(--mantine-color-dark-7)',
+            borderColor: 'var(--mantine-color-dark-4)',
+            color: 'var(--mantine-color-gray-0)',
+          },
+        },
+      }}
+    />
+  );
+}
+
 export function WithRootName() {
   return (
     <Stack>

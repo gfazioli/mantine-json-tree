@@ -398,6 +398,43 @@ describe('JsonTree', () => {
       expect(input).toBeTruthy();
     });
 
+    it('forwards searchInputProps to the internal TextInput', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ a: 1 }}
+          title="Test"
+          withSearch
+          searchInputProps={{
+            placeholder: 'Custom placeholder',
+            radius: 'xl',
+          }}
+        />
+      );
+      fireEvent.click(container.querySelector('.mantine-ActionIcon-root')!);
+      const input = container.querySelector('input[placeholder="Custom placeholder"]');
+      expect(input).toBeTruthy();
+    });
+
+    it('searchInputProps cannot override controlled value/onChange', () => {
+      const onChange = jest.fn();
+      const { container } = render(
+        <JsonTree
+          data={{ a: 1 }}
+          title="Test"
+          withSearch
+          searchInputProps={{
+            value: 'should-be-ignored',
+            onChange,
+          }}
+        />
+      );
+      fireEvent.click(container.querySelector('.mantine-ActionIcon-root')!);
+      const input = container.querySelector('input[placeholder]') as HTMLInputElement;
+      expect(input.value).toBe('');
+      fireEvent.change(input, { target: { value: 'test' } });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
     it('renders with all toolbar features without crashing', () => {
       const { container } = render(
         <JsonTree

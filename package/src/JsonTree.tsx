@@ -25,6 +25,7 @@ import {
   rem,
   ScrollArea,
   TextInput,
+  type TextInputProps,
   StylesApiProps,
   Text,
   Tooltip,
@@ -242,6 +243,23 @@ export interface JsonTreeBaseProps {
 
   /** Debounce delay for search in ms @default 300 */
   searchDebounce?: number;
+
+  /**
+   * Props forwarded to the internal search `TextInput`. Use this to fully customize
+   * the search input via Mantine's native `classNames`, `styles`, `vars`, `variant`,
+   * `radius`, `size`, etc. — no specificity workarounds required.
+   *
+   * @example
+   * ```tsx
+   * <JsonTree
+   *   withSearch
+   *   searchInputProps={{
+   *     styles: { input: { backgroundColor: 'var(--mantine-color-dark-7)' } },
+   *   }}
+   * />
+   * ```
+   */
+  searchInputProps?: TextInputProps;
 }
 
 /** Display mode for functions in JSON data */
@@ -741,6 +759,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     searchQuery: controlledSearchQuery,
     onSearchChange,
     searchDebounce,
+    searchInputProps,
 
     classNames,
     style,
@@ -1055,17 +1074,18 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
             <Box {...getStyles('searchBar')} p="xs">
               <TextInput
                 placeholder={searchPlaceholder}
+                size="sm"
+                leftSection={<IconSearch size={14} />}
+                rightSection={
+                  activeSearchQuery ? <CloseButton size="sm" onClick={handleClearSearch} /> : null
+                }
+                {...searchInputProps}
                 value={activeSearchQuery}
                 onChange={(e) => {
                   const val = e.currentTarget.value;
                   setSearchQueryInternal(val);
                   onSearchChange?.(val);
                 }}
-                leftSection={<IconSearch size={14} />}
-                rightSection={
-                  activeSearchQuery ? <CloseButton size="sm" onClick={handleClearSearch} /> : null
-                }
-                size="sm"
                 {...getStyles('searchInput')}
               />
             </Box>

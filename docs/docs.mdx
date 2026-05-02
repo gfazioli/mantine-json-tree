@@ -51,6 +51,16 @@ Clearing the search restores the previous expand state.
 
 <Demo data={demos.search} />
 
+### Customizing the search input
+
+Use `searchInputProps` to forward any prop to the internal
+`TextInput` — `classNames`, `styles`, `vars`, `variant`,
+`radius`, `size`, `leftSection`, and so on. Because Mantine
+applies `styles` inline, this works without specificity hacks
+or `!important`.
+
+<Demo data={demos.searchInputStyling} />
+
 ## Copy to Clipboard
 
 Both per-node and global copy buttons provide visual
