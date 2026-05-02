@@ -8,6 +8,7 @@ export { maxHeightDemo } from './JsonTree.demo.maxHeight';
 export { pathTooltip } from './JsonTree.demo.pathTooltip';
 export { rootName } from './JsonTree.demo.rootName';
 export { search } from './JsonTree.demo.search';
+export { searchInputStyling } from './JsonTree.demo.searchInputStyling';
 export { specialTypes } from './JsonTree.demo.specialTypes';
 export { sticky } from './JsonTree.demo.sticky';
 export { styled } from './JsonTree.demo.styled';
