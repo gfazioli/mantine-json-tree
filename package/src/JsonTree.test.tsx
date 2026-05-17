@@ -1,7 +1,7 @@
-import React from 'react';
-import { fireEvent } from '@testing-library/react';
-import { Loader } from '@mantine/core';
 import { render } from '@mantine-tests/core';
+import { Loader } from '@mantine/core';
+import { fireEvent } from '@testing-library/react';
+import React from 'react';
 import { JsonTree } from './JsonTree';
 
 describe('JsonTree', () => {

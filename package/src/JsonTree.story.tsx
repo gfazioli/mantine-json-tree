@@ -1,5 +1,5 @@
-import React from 'react';
 import { Loader, ScrollArea, Stack, Title } from '@mantine/core';
+import React from 'react';
 import { JsonTree } from './JsonTree';
 import classes from './JsonTree.story.module.css';
 

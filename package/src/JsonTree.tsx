@@ -1,12 +1,3 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  IconArrowBarToDown,
-  IconArrowBarToUp,
-  IconCheck,
-  IconChevronRight,
-  IconCopy,
-  IconSearch,
-} from '@tabler/icons-react';
 import {
   ActionIcon,
   Badge,
@@ -40,6 +31,15 @@ import {
   type TooltipProps,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
+import {
+  IconArrowBarToDown,
+  IconArrowBarToUp,
+  IconCheck,
+  IconChevronRight,
+  IconCopy,
+  IconSearch,
+} from '@tabler/icons-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import {
   convertToTreeData,

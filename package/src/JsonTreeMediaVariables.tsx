@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   filterProps,
   getBaseValue,
@@ -11,6 +10,7 @@ import {
   useMantineTheme,
   type StyleProp,
 } from '@mantine/core';
+import React from 'react';
 
 interface JsonTreeMediaVariablesProps {
   size?: StyleProp<MantineSize | (string & {}) | number>;
