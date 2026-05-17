@@ -1,5 +1,5 @@
-import React from 'react';
 import { ScrollArea, Stack } from '@mantine/core';
+import React from 'react';
 import { JsonTree, JsonTreeProps } from './JsonTree';
 
 export default {

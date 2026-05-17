@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { JsonTree } from '@gfazioli/mantine-json-tree';
 import { Code, Stack, Text } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
+import { useState } from 'react';
 import { data, dataCode } from './data';
 
 const code = `
