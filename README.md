@@ -104,7 +104,3 @@ Your help truly matters.
 
 ---
 https://github.com/user-attachments/assets/ce2b1ba2-51f7-43d5-8477-6d8fee103fa3
-
----
-[![Star History Chart](https://api.star-history.com/svg?repos=gfazioli/mantine-json-tree&type=Timeline)](https://www.star-history.com/#gfazioli/mantine-json-tree&Timeline)
-
