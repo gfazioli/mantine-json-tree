@@ -24,6 +24,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     copyButton: 'Copy to clipboard button',
     ellipsis: 'Element that renders ellipsis for collapsed nodes',
     lineNumber: 'Element that renders line numbers',
+    valueEditor: 'Wrapper around the inline editor shown while a value is being edited',
   },
 
   vars: {
@@ -55,6 +56,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-color-map': 'Color for Map collection values',
       '--json-tree-color-set': 'Color for Set collection values',
       '--json-tree-color-circular': 'Color for circular reference markers',
+      '--json-tree-color-editable-outline': 'Outline color shown when hovering an editable value',
     },
     bracket: {
       '--json-tree-color-bracket': 'Color for brackets and punctuation',
@@ -72,6 +74,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     ellipsis: {
       '--json-tree-color-ellipsis': 'Color for the ellipsis indicator on collapsed nodes',
     },
+    valueEditor: {},
     lineNumber: {
       '--json-tree-color-line-number': 'Color for line numbers',
     },

@@ -27,6 +27,8 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 ## Features
 
 - Interactive collapsible tree view for any JSON-serializable data
+- **In-place editing** of strings, numbers and booleans (`editable`, `onChange`) — immutable updates that
+  leave every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element in the tree untouched
 - **Search** with text highlight, filtered tree view, and auto-expand matching branches
 - **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
 - **Paper wrapper** with `withBorder` for bordered container look
