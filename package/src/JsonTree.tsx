@@ -376,6 +376,14 @@ export const defaultProps: Partial<JsonTreeProps> = {
   editableTypes: ['string', 'number', 'boolean'],
 };
 
+/** Elements that own the Enter key themselves — activating them must win over editing. */
+const KEYBOARD_ACTIVATED_SELECTOR =
+  'button, a[href], input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
+/** Form controls whose own copy shortcut must not be hijacked. */
+const FORM_CONTROL_SELECTOR =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
 interface RenderNodeContext {
   getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
   copyToClipboardIcon: React.ReactNode;
@@ -648,8 +656,14 @@ function renderJSONNode(
                       event.stopPropagation();
                       if (type === 'boolean') {
                         // a boolean has exactly one other state, so there is
-                        // nothing to type: toggle it and skip the editor
-                        ctx.onCommitEdit?.(jsonNode, !value);
+                        // nothing to type: toggle it and skip the editor. It is
+                        // still a commit, so `validate` gets its say — refusing
+                        // the toggle is the feedback, since there is no field to
+                        // hang a message on.
+                        const next = !value;
+                        if ((ctx.validateNode?.(jsonNode, next) ?? null) === null) {
+                          ctx.onCommitEdit?.(jsonNode, next);
+                        }
                         return;
                       }
                       ctx.onStartEdit?.(
@@ -1080,6 +1094,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       // keeps one code path for mouse and keyboard — and, more importantly,
       // avoids giving every value its own tab stop just to be reachable.
       if (editable && e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        // A row can hold its own controls — the per-node copy button, a link in a
+        // custom title. Enter belongs to whichever one has focus; taking it here
+        // would leave that control unreachable from the keyboard, which is the
+        // exact failure this shortcut exists to avoid elsewhere.
+        if ((e.target as HTMLElement | null)?.closest?.(KEYBOARD_ACTIVATED_SELECTOR)) {
+          return;
+        }
         const row = (document.activeElement as HTMLElement | null)?.closest?.('[role="treeitem"]');
         if (row && (e.currentTarget as HTMLElement).contains(row)) {
           const cell = Array.from(row.querySelectorAll<HTMLElement>('[data-edit-key]')).find(
@@ -1101,11 +1122,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       // Never hijack the native copy of a selection made inside a form control
       // rendered within the tree (the search input, a custom `title`, …).
       const target = e.target as HTMLElement | null;
-      if (
-        target?.closest?.(
-          'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
-        )
-      ) {
+      if (target?.closest?.(FORM_CONTROL_SELECTOR)) {
         return;
       }
 
