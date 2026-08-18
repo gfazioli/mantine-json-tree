@@ -1084,5 +1084,43 @@ describe('JsonTree', () => {
       await user.keyboard('{Enter}');
       expect(onChange.mock.calls[0][0].name).toBe('a b c');
     });
+    it('runs validate on a boolean toggle too', async () => {
+      // the toggle skips the editor, but it is still a commit — a consumer
+      // `validate` that rejects the new state must be able to stop it
+      const user = userEvent.setup();
+      const validate = jest.fn((_payload: any) => 'not allowed');
+      const { container, onChange } = setup({ editable: true, validate });
+
+      await user.click(cell(container, 'root.isAdmin'));
+
+      expect(validate).toHaveBeenCalledTimes(1);
+      expect(validate.mock.calls[0][0]).toMatchObject({ type: 'boolean', value: true });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(cell(container, 'root.isAdmin').textContent).toBe('false');
+    });
+
+    it('leaves Enter to a focused control inside the row', async () => {
+      // the row can hold its own buttons; taking Enter here would make the
+      // per-node copy button unreachable from the keyboard
+      const user = userEvent.setup();
+      // after setup(): userEvent installs a clipboard stub of its own
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+      const { container } = setup({ editable: true, withCopyToClipboard: true });
+
+      const row = container.querySelector<HTMLElement>(
+        'li[role="treeitem"][data-value="root.name"]'
+      )!;
+      row.querySelector('button')!.focus();
+      await user.keyboard('{Enter}');
+
+      expect(container.querySelector('[class*="valueEditor"]')).toBeNull();
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(writeText.mock.calls[0][0]).toBe('"John"');
+    });
   });
 });
