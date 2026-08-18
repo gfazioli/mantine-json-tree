@@ -634,6 +634,7 @@ function renderJSONNode(
                 <JsonTreeValueEditor
                   value={value}
                   type={type}
+                  label={key ?? path}
                   editorProps={ctx.editorProps}
                   validate={(next) => ctx.validateNode?.(jsonNode, next) ?? null}
                   onCommit={(next) => ctx.onCommitEdit?.(jsonNode, next)}

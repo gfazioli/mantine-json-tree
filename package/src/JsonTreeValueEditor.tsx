@@ -31,6 +31,9 @@ export interface JsonTreeValueEditorProps {
 
   /** Props forwarded to the input */
   editorProps?: JsonTreeEditorProps;
+
+  /** The key being edited, used to name the field for assistive technology */
+  label?: string;
 }
 
 /**
@@ -53,6 +56,7 @@ export function JsonTreeValueEditor({
   onCancel,
   validate,
   editorProps,
+  label,
 }: JsonTreeValueEditorProps) {
   const [draft, setDraft] = useState<string | number>(() =>
     type === 'number' ? (value as number) : String(value ?? '')
@@ -120,6 +124,10 @@ export function JsonTreeValueEditor({
   // exactly the failure the guard exists to prevent.
   const shared = {
     ...editorProps,
+    // Without a name, assistive technology announces an empty edit field with no
+    // clue which key it belongs to. Derived from the data's own key, so the only
+    // English in it is the verb — and a consumer can still override it.
+    'aria-label': editorProps?.['aria-label'] ?? (label ? `Edit ${label}` : 'Edit value'),
     autoFocus: true,
     error,
     size: editorProps?.size ?? ('xs' as const),
