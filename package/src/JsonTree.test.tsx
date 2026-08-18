@@ -634,4 +634,80 @@ describe('JsonTree', () => {
       expect(container.querySelector('[data-type="circular"]')).toBeTruthy();
     });
   });
+  describe('clipboard serialization', () => {
+    const { stringifyValue } = require('./lib/utils');
+
+    it('keeps JSON-representable values exactly as JSON.stringify would', () => {
+      expect(stringifyValue({ a: 1 })).toBe(JSON.stringify({ a: 1 }, null, 2));
+      expect(stringifyValue([1, 'two'])).toBe(JSON.stringify([1, 'two'], null, 2));
+      expect(stringifyValue('he said "hi"')).toBe('"he said \\"hi\\""');
+      expect(stringifyValue(null)).toBe('null');
+      expect(stringifyValue(42)).toBe('42');
+    });
+
+    it('falls back to the rendered form for values JSON drops', () => {
+      // JSON.stringify returns undefined for these, which used to put the
+      // literal text "undefined" on the clipboard for every one of them
+      expect(stringifyValue(function handleClick() {})).toBe('[Function: handleClick]');
+      expect(stringifyValue(Symbol.for('app.config'))).toBe('Symbol(app.config)');
+      expect(stringifyValue(undefined)).toBe('undefined');
+    });
+
+    it('serializes BigInt instead of throwing', () => {
+      // JSON.stringify throws a TypeError on BigInt, which the copy handlers
+      // swallowed as a silent no-op
+      expect(stringifyValue(BigInt(123))).toBe('123n');
+      expect(stringifyValue({ id: BigInt(9007199254740991) })).toContain('"9007199254740991n"');
+    });
+
+    it('marks cycles instead of throwing', () => {
+      const node: any = { name: 'node' };
+      node.self = node;
+      const out = stringifyValue(node);
+      expect(out).toContain('"name": "node"');
+      expect(out).toContain('"self": "[Circular]"');
+    });
+
+    it('marks a cycle nested below the root', () => {
+      const parent: any = { id: 1, child: { id: 2 } };
+      parent.child.parent = parent;
+      const out = JSON.parse(stringifyValue(parent));
+      expect(out).toEqual({ id: 1, child: { id: 2, parent: '[Circular]' } });
+    });
+
+    it('serializes a shared reference in full on both sides', () => {
+      const shared = { flag: true };
+      const out = JSON.parse(stringifyValue({ left: shared, right: shared }));
+      // shared but acyclic: neither side may collapse to a marker
+      expect(out).toEqual({ left: { flag: true }, right: { flag: true } });
+    });
+
+    it('survives a cycle through an array', () => {
+      const arr: unknown[] = [1];
+      arr.push(arr);
+      expect(JSON.parse(stringifyValue(arr))).toEqual([1, '[Circular]']);
+    });
+
+    it('copies a node holding a cycle instead of doing nothing', async () => {
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+
+      const data: any = { id: 'root' };
+      data.self = data;
+
+      const { container } = render(
+        <JsonTree data={data} defaultExpanded maxDepth={-1} withCopyToClipboard />
+      );
+      const row = container.querySelector<HTMLElement>('li[role="treeitem"][data-value="root"]')!;
+      row.focus();
+      fireEvent.keyDown(row, { key: 'c', metaKey: true });
+
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(writeText.mock.calls[0][0]).toContain('"self": "[Circular]"');
+    });
+  });
 });

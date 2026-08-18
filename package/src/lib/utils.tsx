@@ -46,7 +46,7 @@ export type ValueType =
  * everyday shape in form-builder and low-code JSON, and treating it as an
  * element hides the whole subtree behind `<Component />`.
  */
-function isReactElement(value: any): boolean {
+function isReactElement(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -179,6 +179,80 @@ export function formatValue(value: any, type: ValueType): string {
     return '[Circular]';
   }
   return String(value);
+}
+
+/**
+ * Values JSON cannot express, rendered the way the tree shows them. Returns
+ * `undefined` when JSON is able to represent the value on its own.
+ */
+function formatNonJsonValue(value: unknown): string | undefined {
+  const type = getValueType(value);
+  if (type === 'undefined' || type === 'function' || type === 'symbol' || type === 'bigint') {
+    return formatValue(value, type);
+  }
+  return undefined;
+}
+
+/**
+ * A `JSON.stringify` replacer that swaps reference cycles for the same
+ * `[Circular]` marker the tree renders, and non-JSON leaves for their displayed
+ * form. It follows the ancestor chain rather than a set of everything already
+ * seen, so a value referenced from two sibling branches — shared, not circular —
+ * is still serialized in full on both sides, exactly as the tree expands it.
+ */
+function createCycleSafeReplacer() {
+  const ancestors: unknown[] = [];
+
+  return function replacer(this: unknown, _key: string, value: unknown): unknown {
+    const nonJson = formatNonJsonValue(value);
+    if (nonJson !== undefined) {
+      return nonJson;
+    }
+
+    if (isReferenceType(value)) {
+      // `this` is the holder the value was read from: unwind the chain back to
+      // it before testing, so only real ancestors count.
+      const index = ancestors.indexOf(this);
+      if (index === -1) {
+        ancestors.push(this);
+      } else {
+        ancestors.length = index + 1;
+      }
+      if (ancestors.includes(value)) {
+        return '[Circular]';
+      }
+    }
+
+    return value;
+  };
+}
+
+/**
+ * Serialize a value for the clipboard the way the tree displays it.
+ *
+ * `JSON.stringify` alone does not cover what the tree can render: it returns
+ * `undefined` for `undefined`, functions and symbols — which would put the
+ * literal text "undefined" on the clipboard — and it throws on BigInt and on
+ * anything holding a reference cycle, which the copy handlers swallowed as a
+ * silent no-op. Both cases now fall back to the rendered form, so what lands on
+ * the clipboard matches what is on screen.
+ */
+export function stringifyValue(value: unknown): string {
+  const direct = formatNonJsonValue(value);
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  try {
+    const json = JSON.stringify(value, createCycleSafeReplacer(), 2);
+    if (json !== undefined) {
+      return json;
+    }
+  } catch {
+    // Values JSON refuses outright fall through to the rendered form below
+  }
+
+  return formatValue(value, getValueType(value));
 }
 
 /**
