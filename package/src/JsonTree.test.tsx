@@ -1,6 +1,6 @@
 import { render } from '@mantine-tests/core';
 import { Loader } from '@mantine/core';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { JsonTree } from './JsonTree';
 
@@ -508,6 +508,130 @@ describe('JsonTree', () => {
       const treeData = [convertToTreeData({ Name: 'ALICE' }, 'root', 'root', 0)];
       const result = searchTree(treeData, 'alice');
       expect(result.directMatches.size).toBeGreaterThan(0);
+    });
+  });
+  describe('keyboard copy targeting', () => {
+    const mockClipboard = () => {
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+      return writeText;
+    };
+
+    it('copies the focused node, not the root', async () => {
+      const writeText = mockClipboard();
+      const { container } = render(
+        <JsonTree
+          data={{ alpha: { nested: 'AAA' }, beta: 'BBB' }}
+          defaultExpanded
+          maxDepth={-1}
+          withCopyToClipboard
+        />
+      );
+
+      const row = container.querySelector<HTMLElement>(
+        'li[role="treeitem"][data-value="root.beta"]'
+      )!;
+      row.focus();
+      fireEvent.keyDown(row, { key: 'c', metaKey: true });
+
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(writeText.mock.calls[0][0]).toBe('"BBB"');
+    });
+
+    it('falls back to the root node when nothing inside the tree has focus', async () => {
+      const writeText = mockClipboard();
+      const { container } = render(
+        <JsonTree data={{ beta: 'BBB' }} defaultExpanded maxDepth={-1} withCopyToClipboard />
+      );
+
+      const root = container.querySelector<HTMLElement>('li[role="treeitem"][data-value="root"]')!;
+      fireEvent.keyDown(root, { key: 'c', metaKey: true });
+
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(JSON.parse(writeText.mock.calls[0][0])).toEqual({ beta: 'BBB' });
+    });
+
+    it('does not hijack copy from a form control inside the component', async () => {
+      const writeText = mockClipboard();
+      const { container } = render(
+        <JsonTree data={{ a: 1 }} title="Test" withSearch withCopyToClipboard />
+      );
+      fireEvent.click(container.querySelector('.mantine-ActionIcon-root')!);
+
+      const input = container.querySelector<HTMLElement>('input[placeholder]')!;
+      fireEvent.keyDown(input, { key: 'c', metaKey: true });
+
+      await Promise.resolve();
+      expect(writeText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('React element detection', () => {
+    it('treats a plain object carrying type and props as data, not an element', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ field: { type: 'text', props: { label: 'Name' } } }}
+          defaultExpanded
+          maxDepth={-1}
+        />
+      );
+
+      // The subtree must be reachable, not collapsed into `<Component />`
+      expect(container.querySelector('[data-value="root.field.type"]')).toBeTruthy();
+      expect(container.querySelector('[data-value="root.field.props.label"]')).toBeTruthy();
+      expect(container.querySelector('[data-type="react-element"]')).toBeFalsy();
+    });
+
+    it('still detects real React elements', () => {
+      const { container } = render(
+        <JsonTree data={{ el: <Loader /> }} defaultExpanded maxDepth={-1} />
+      );
+      expect(container.querySelector('[data-type="react-element"]')).toBeTruthy();
+    });
+  });
+
+  describe('circular references', () => {
+    it('renders a marker instead of overflowing the stack', () => {
+      const data: any = { name: 'node' };
+      data.self = data;
+
+      const { container } = render(<JsonTree data={data} defaultExpanded maxDepth={-1} />);
+
+      const marker = container.querySelector('[data-type="circular"]');
+      expect(marker).toBeTruthy();
+      expect(marker?.textContent).toBe('[Circular]');
+    });
+
+    it('detects a cycle nested deeper than the root', () => {
+      const parent: any = { id: 1, child: { id: 2 } };
+      parent.child.parent = parent;
+
+      const { container } = render(<JsonTree data={parent} defaultExpanded maxDepth={-1} />);
+      expect(container.querySelector('[data-value="root.child.parent"]')).toBeTruthy();
+      expect(container.querySelector('[data-type="circular"]')).toBeTruthy();
+    });
+
+    it('expands a shared reference in every branch that holds it', () => {
+      const shared = { flag: true };
+      const { container } = render(
+        <JsonTree data={{ left: shared, right: shared }} defaultExpanded maxDepth={-1} />
+      );
+
+      // Shared but acyclic: both branches must expand, neither is a cycle
+      expect(container.querySelector('[data-value="root.left.flag"]')).toBeTruthy();
+      expect(container.querySelector('[data-value="root.right.flag"]')).toBeTruthy();
+      expect(container.querySelector('[data-type="circular"]')).toBeFalsy();
+    });
+
+    it('survives a cycle through an array', () => {
+      const arr: any[] = [1];
+      arr.push(arr);
+      const { container } = render(<JsonTree data={{ arr }} defaultExpanded maxDepth={-1} />);
+      expect(container.querySelector('[data-type="circular"]')).toBeTruthy();
     });
   });
 });

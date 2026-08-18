@@ -109,6 +109,11 @@
     color: var(--json-tree-color-map);
     font-weight: 600;
   }
+
+  &[data-type='circular'] {
+    color: var(--json-tree-color-circular);
+    font-style: italic;
+  }
 }
 
 .bracket {
