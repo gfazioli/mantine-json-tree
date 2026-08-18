@@ -32,19 +32,33 @@ export type ValueType =
   | 'symbol'
   | 'regexp'
   | 'map'
-  | 'set';
+  | 'set'
+  | 'circular';
 
 /**
  * Check if a value is a React element.
+ *
+ * Detection relies on the `$$typeof` marker alone. React stamps every element
+ * with a symbol from the global registry (`react.element`,
+ * `react.transitional.element`, …), so matching the `react.` prefix also covers
+ * renderer variants without enumerating them. A structural `type` + `props`
+ * check would misread ordinary data: `{ type: 'text', props: { … } }` is an
+ * everyday shape in form-builder and low-code JSON, and treating it as an
+ * element hides the whole subtree behind `<Component />`.
  */
 function isReactElement(value: any): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value.$$typeof === Symbol.for('react.element') ||
-      value.$$typeof === Symbol.for('react.transitional.element') ||
-      (typeof value.type !== 'undefined' && typeof value.props !== 'undefined'))
-  );
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const marker = (value as { $$typeof?: unknown }).$$typeof;
+  return typeof marker === 'symbol' && (marker.description ?? '').startsWith('react.');
+}
+
+/**
+ * Check whether a value can take part in a reference cycle.
+ */
+function isReferenceType(value: unknown): boolean {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function';
 }
 
 /**
@@ -161,6 +175,9 @@ export function formatValue(value: any, type: ValueType): string {
   if (type === 'set') {
     return `Set(${value.size})`;
   }
+  if (type === 'circular') {
+    return '[Circular]';
+  }
   return String(value);
 }
 
@@ -188,9 +205,23 @@ export function convertToTreeData(
   key?: string,
   path: string = 'root',
   depth: number = 0,
-  displayFunctions: JsonTreeFunctionDisplay = 'as-string'
+  displayFunctions: JsonTreeFunctionDisplay = 'as-string',
+  ancestors: readonly unknown[] = []
 ): JSONTreeNodeData {
   const type = getValueType(value);
+
+  // Guard against reference cycles, which would otherwise recurse until the
+  // stack blows (`obj.self = obj` is routine in debug panels and object graphs).
+  // Only the current ancestor chain is tracked, never every value already seen,
+  // so a value referenced twice in sibling branches — shared but not circular —
+  // still expands normally in both places.
+  if (isReferenceType(value) && ancestors.includes(value)) {
+    return {
+      value: path,
+      label: key ?? path,
+      nodeData: { type: 'circular', value, key, path, depth },
+    };
+  }
 
   // Handle React elements as primitive values to avoid circular reference issues
   if (type === 'react-element') {
@@ -239,7 +270,10 @@ export function convertToTreeData(
       },
       {} as Record<string, any>
     );
-    return convertToTreeData(functionProps, key, path, depth, displayFunctions);
+    return convertToTreeData(functionProps, key, path, depth, displayFunctions, [
+      ...ancestors,
+      value,
+    ]);
   }
 
   const expandable = isExpandable(value);
@@ -268,8 +302,11 @@ export function convertToTreeData(
     entries = Object.entries(value);
   }
 
+  const childAncestors = [...ancestors, value];
   const children = entries
-    .map(([k, v]) => convertToTreeData(v, k, `${path}.${k}`, depth + 1, displayFunctions))
+    .map(([k, v]) =>
+      convertToTreeData(v, k, `${path}.${k}`, depth + 1, displayFunctions, childAncestors)
+    )
     .filter((node) => node !== null); // Filter out hidden functions
 
   return {

@@ -95,7 +95,8 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-symbol'
     | '--json-tree-color-regexp'
     | '--json-tree-color-map'
-    | '--json-tree-color-set';
+    | '--json-tree-color-set'
+    | '--json-tree-color-circular';
   bracket: '--json-tree-color-bracket';
   indentGuide:
     | '--json-tree-indent-guide-color-0'
@@ -688,6 +689,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-regexp': 'var(--mantine-color-lime-7)',
         '--json-tree-color-map': 'var(--mantine-color-grape-7)',
         '--json-tree-color-set': 'var(--mantine-color-grape-7)',
+        '--json-tree-color-circular': 'var(--mantine-color-red-6)',
       },
       bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
       indentGuide: {
@@ -845,26 +847,53 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Keyboard handler for Ctrl+C copy on focused node
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && withCopyToClipboard) {
-        e.preventDefault();
-        const focused = (e.currentTarget as HTMLElement).querySelector(
-          '[data-value][tabindex="0"], [data-value]:focus'
-        );
-        if (focused) {
-          const nodePath = focused.getAttribute('data-value');
-          if (nodePath) {
-            const nodeData = findNodeByPath(treeData, nodePath);
-            if (nodeData?.nodeData) {
-              try {
-                const copy = JSON.stringify(nodeData.nodeData.value, null, 2);
-                await navigator.clipboard.writeText(copy);
-                onCopy?.(copy, nodeData.nodeData.value);
-              } catch {
-                // Clipboard write may fail silently in unsupported contexts
-              }
-            }
-          }
-        }
+      if (!withCopyToClipboard || !(e.metaKey || e.ctrlKey) || e.key !== 'c') {
+        return;
+      }
+
+      // Never hijack the native copy of a selection made inside a form control
+      // rendered within the tree (the search input, a custom `title`, …).
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.(
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
+        )
+      ) {
+        return;
+      }
+
+      // Resolve the row that actually holds focus. Matching `[tabindex="0"]`
+      // could only ever find the root: Mantine's Tree gives the root node
+      // tabindex 0 and every other node -1, and `querySelector` resolves in
+      // document order — so the root won over the focused node every time.
+      // Scoping to `[role="treeitem"]` also keeps the value cells out of the
+      // match, since those carry a `data-value` holding the formatted value
+      // rather than a node path.
+      const root = e.currentTarget as HTMLElement;
+      const active = document.activeElement as HTMLElement | null;
+      const focused =
+        (active && root.contains(active)
+          ? active.closest('[role="treeitem"][data-value]')
+          : null) ?? root.querySelector('[role="treeitem"][data-value]');
+
+      const nodePath = focused?.getAttribute('data-value');
+      if (!nodePath) {
+        return;
+      }
+
+      const nodeData = findNodeByPath(treeData, nodePath);
+      if (!nodeData?.nodeData) {
+        return;
+      }
+
+      e.preventDefault();
+      try {
+        const copy = JSON.stringify(nodeData.nodeData.value, null, 2);
+        await navigator.clipboard.writeText(copy);
+        onCopy?.(copy, nodeData.nodeData.value);
+      } catch {
+        // Clipboard write may fail silently in unsupported contexts, and
+        // JSON.stringify throws on circular data
       }
     },
     [withCopyToClipboard, treeData, onCopy]

@@ -54,6 +54,7 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-color-regexp': 'Color for RegExp values',
       '--json-tree-color-map': 'Color for Map collection values',
       '--json-tree-color-set': 'Color for Set collection values',
+      '--json-tree-color-circular': 'Color for circular reference markers',
     },
     bracket: {
       '--json-tree-color-bracket': 'Color for brackets and punctuation',

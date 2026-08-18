@@ -16,6 +16,7 @@ import * as demos from './demos';
 - Controlled expand/collapse state (`expanded`, `onExpandedChange`)
 - `onExpand` and `onCollapse` callbacks for individual node toggling
 - Keyboard copy: `Ctrl+C` / `Cmd+C` copies the focused node when `withCopyToClipboard` is enabled
+- **Circular references** are detected and marked instead of crashing the component
 - Responsive `size` prop via Mantine breakpoint objects (CSS-native, no re-renders)
 
 ## Installation
@@ -103,9 +104,26 @@ Below is an example of syntax highlighting for different JSON value types: strin
 - **Set**: Unique value collections that are expandable to show their elements
 - **React Elements**: React components displayed with their component name (e.g., `<Loader />`)
 
+React elements are recognised by their internal `$$typeof` marker, so ordinary data is never
+mistaken for one. An object such as `{ type: 'text', props: { label: 'Name' } }` — a common
+shape in form-builder and low-code JSON — is rendered as a regular, expandable object.
+
 All colors can be customized using CSS variables for each type.
 
 <Demo data={demos.specialTypes} />
+
+## Circular References
+
+Object graphs that point back at themselves are everywhere in real debugging sessions — a child
+holding a reference to its parent, a linked list, a cached entity pointing at the store that owns
+it. `JsonTree` walks the current branch and stops as soon as a value reappears on its own ancestor
+chain, rendering it as `[Circular]` rather than recursing until the stack overflows.
+
+Only the ancestor chain is tracked, never every value already visited. A value referenced from two
+different branches is shared, not circular, so it keeps expanding normally in both places — as the
+`config` object does below.
+
+<Demo data={demos.circular} />
 
 ## Indent Guides
 
@@ -157,7 +175,9 @@ Use the `onNodeClick` callback to handle clicks on any node in the tree, and the
 - **Arrow Right**: Expand a collapsed node or move to first child
 - **Arrow Left**: Collapse an expanded node or move to parent
 - **Space**: Toggle node expansion
-- **Ctrl+C / Cmd+C**: Copy the focused node's value to clipboard (when `withCopyToClipboard` is enabled)
+- **Ctrl+C / Cmd+C**: Copy the focused node's value to clipboard (when `withCopyToClipboard` is
+  enabled). With no node focused it falls back to the root, and it never intercepts the shortcut
+  while a form control inside the component — such as the search input — holds focus.
 
 ## Path Tooltip
 

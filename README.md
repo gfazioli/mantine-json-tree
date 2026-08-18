@@ -32,6 +32,8 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - **Paper wrapper** with `withBorder` for bordered container look
 - **Custom root name** via `rootName` prop
 - Syntax highlighting with customizable colors for 16+ data types (strings, numbers, booleans, null, Date, RegExp, Map, Set, BigInt, Symbol, React elements, etc.)
+- Safe on object graphs: circular references are marked `[Circular]` instead of crashing, while
+  shared non-circular references still expand everywhere they appear
 - Dark mode support with automatic color adaptation
 - Copy-to-clipboard on individual nodes + global copy all JSON
 - Keyboard navigation (arrow keys, Space to expand, Ctrl+C to copy)
