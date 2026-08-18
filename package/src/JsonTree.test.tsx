@@ -1010,5 +1010,15 @@ describe('JsonTree', () => {
       expect(cells.length).toBeGreaterThan(0);
       cells.forEach((c) => expect(c.getAttribute('tabindex')).toBeNull());
     });
+    it('adds nothing to the markup when editing is off', () => {
+      // the read-only render path must stay exactly what it was before `editable`
+      // existed, down to the inline custom properties
+      const { container } = render(<JsonTree data={{ a: 1 }} defaultExpanded maxDepth={-1} />);
+      const html = container.innerHTML;
+
+      expect(html).not.toContain('editable-outline');
+      expect(html).not.toContain('data-editable');
+      expect(html).not.toContain('data-edit-key');
+    });
   });
 });

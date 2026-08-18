@@ -3,6 +3,8 @@ import * as demos from './demos';
 
 ## What's new
 
+- **Editable values** — click a string, number or boolean to edit it in place (`editable`, `onChange`)
+- **Circular references** are detected and marked instead of crashing the component
 - **Search** with text highlight, auto-expand, and filtered tree view (`withSearch`)
 - **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
 - **Paper wrapper** with `withBorder` for bordered container look
@@ -16,8 +18,6 @@ import * as demos from './demos';
 - Controlled expand/collapse state (`expanded`, `onExpandedChange`)
 - `onExpand` and `onCollapse` callbacks for individual node toggling
 - Keyboard copy: `Ctrl+C` / `Cmd+C` copies the focused node when `withCopyToClipboard` is enabled
-- **Editable values** — click a string, number or boolean to edit it in place (`editable`, `onChange`)
-- **Circular references** are detected and marked instead of crashing the component
 - Responsive `size` prop via Mantine breakpoint objects (CSS-native, no re-renders)
 
 ## Installation
@@ -42,44 +42,11 @@ The `JsonTree` is interactive JSON tree viewer component built with [Mantine's T
 
 <Demo data={demos.configurator} />
 
-## Search
-
-Enable `withSearch` to add a search toggle in the toolbar.
-When active, the tree filters to show only branches with
-matching keys or values. Direct matches get an amber
-background highlight, and the matching text portion is
-highlighted inline. Parent nodes are preserved for context.
-Clearing the search restores the previous expand state.
-
-<Demo data={demos.search} />
-
-### Customizing the search input
-
-Use `searchInputProps` to forward any prop to the internal
-`TextInput` — `classNames`, `styles`, `vars`, `variant`,
-`radius`, `size`, `leftSection`, and so on. Because Mantine
-applies `styles` inline, this works without specificity hacks
-or `!important`.
-
-<Demo data={demos.searchInputStyling} />
-
-## Copy to Clipboard
-
-Both per-node and global copy buttons provide visual
-feedback — the icon briefly changes to a green
-checkmark after a successful copy.
-
-The **global copy** button (`withCopyAll`) copies the
-raw JSON data without the `rootName` wrapper. The
-`rootName` is a display-only label and is not included
-in the copied output. This makes the copied JSON
-directly usable in code and API tools.
-
 ## Editing Values
 
 Set `editable` to let a reader change a value in place. Click a string or a number to open an
 inline editor — `Enter` commits, `Escape` cancels, moving focus commits — or click a boolean to
-toggle it outright, since it has exactly one other state to move to. With a row focused, `Enter`
+toggle it outright, since it has exactly one other state. With a row focused, `Enter`
 opens its editor too, so the whole flow works from the keyboard without adding a tab stop per value.
 
 `JsonTree` is **controlled** while editing: it never keeps its own copy of your data. `onChange`
@@ -108,7 +75,7 @@ Two kinds of node can never be edited, whatever you put in that list:
   data={data}
   editable
   onChange={setData}
-  isEditable={({ path, type }) => path !== 'root.id'}
+  isEditable={({ path }) => path !== 'root.id'}
   validate={({ value }) => (String(value).trim() === '' ? 'Cannot be empty' : null)}
 />
 ```
@@ -125,6 +92,41 @@ Two kinds of node can never be edited, whatever you put in that list:
   node you clicked.
 
 Use `path` for display and logging; use `pathSegments` whenever you need to act on the node.
+
+## Search
+
+Enable `withSearch` to add a search toggle in the toolbar.
+When active, the tree filters to show only branches with
+matching keys or values. Direct matches get an amber
+background highlight, and the matching text portion is
+highlighted inline. Parent nodes are preserved for context.
+Clearing the search restores the previous expand state.
+
+<Demo data={demos.search} />
+
+### Customizing the search input
+
+Use `searchInputProps` to forward any prop to the internal
+`TextInput` — `classNames`, `styles`, `vars`, `variant`,
+`radius`, `size`, `leftSection`, and so on. Because Mantine
+applies `styles` inline, this works without specificity hacks
+or `!important`.
+
+<Demo data={demos.searchInputStyling} />
+
+## Copy to Clipboard
+
+Both per-node and global copy buttons provide visual feedback — the icon briefly changes to a green
+checkmark after a successful copy.
+
+The **global copy** button (`withCopyAll`) copies the raw JSON data without the `rootName` wrapper.
+The `rootName` is a display-only label and is not included in the copied output. This makes the
+copied JSON directly usable in code and API tools.
+
+What lands on the clipboard is what the tree shows. `JSON.stringify` alone cannot express
+everything the tree renders — it returns `undefined` for functions, symbols and `undefined`, and
+throws on `BigInt` and on any value holding a reference cycle — so those fall back to the rendered
+form rather than copying the literal text `undefined` or silently doing nothing.
 
 ## Root Name
 
@@ -227,6 +229,8 @@ Use the `onNodeClick` callback to handle clicks on any node in the tree, and the
 - **Arrow Right**: Expand a collapsed node or move to first child
 - **Arrow Left**: Collapse an expanded node or move to parent
 - **Space**: Toggle node expansion
+- **Enter**: Open the inline editor for the focused row (when `editable` is enabled). Editable
+  values add no tab stop of their own, so a large tree stays one stop, as Mantine's Tree intends
 - **Ctrl+C / Cmd+C**: Copy the focused node's value to clipboard (when `withCopyToClipboard` is
   enabled). With no node focused it falls back to the root, and it never intercepts the shortcut
   while a form control inside the component — such as the search input — holds focus.

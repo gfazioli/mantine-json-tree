@@ -780,7 +780,7 @@ function renderJSONNode(
 }
 
 const varsResolver = createVarsResolver<JsonTreeFactory>(
-  (_, { stickyHeader, stickyHeaderOffset }) => {
+  (_, { stickyHeader, stickyHeaderOffset, editable }) => {
     return {
       root: {
         '--json-tree-font-family': 'var(--mantine-font-family-monospace)',
@@ -809,7 +809,9 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-map': 'var(--mantine-color-grape-7)',
         '--json-tree-color-set': 'var(--mantine-color-grape-7)',
         '--json-tree-color-circular': 'var(--mantine-color-red-6)',
-        '--json-tree-color-editable-outline': 'var(--mantine-color-blue-5)',
+        // Only emitted when editing is on. Mantine drops `undefined` vars, so a
+        // read-only tree renders exactly the markup it did before this prop existed.
+        '--json-tree-color-editable-outline': editable ? 'var(--mantine-color-blue-5)' : undefined,
       },
       bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
       indentGuide: {

@@ -22,6 +22,8 @@ It requires **Mantine 9.x** and **React 19**.
 
 [Mantine JsonTree](https://gfazioli.github.io/mantine-json-tree) provides a structured, interactive view of heterogeneous data—strings, numbers, booleans, nulls, objects, arrays, and even functions—organized as a collapsible tree. Developers can control initial expansion, show visual indent guides, and customize expand/collapse controls with arbitrary React nodes (e.g., emojis or styled icons) to match their design system. For function values, the component offers flexible rendering modes: show the function signature as text, hide functions entirely, or inspect them as objects when needed.
 
+Set `editable` and the same tree becomes an editor: click a string or a number to change it in place, click a boolean to toggle it. Updates are immutable and rebuild only the path down to the edited node, so every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element elsewhere in the tree keeps its identity.
+
 Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTree integrates cleanly into dashboards, developer tools, and documentation pages where readable, navigable data visualization is essential.
 
 ## Features
@@ -81,6 +83,19 @@ import { JsonTree } from '@gfazioli/mantine-json-tree';
 
 function Demo() {
   return <JsonTree data={{ key: "value" }} />;
+}
+```
+
+To let a reader change values, add `editable` and feed `onChange` back through `data` — `JsonTree` keeps no copy of your data:
+
+```tsx
+import { useState } from 'react';
+import { JsonTree } from '@gfazioli/mantine-json-tree';
+
+function Demo() {
+  const [data, setData] = useState({ key: 'value', count: 1, enabled: false });
+
+  return <JsonTree data={data} editable onChange={setData} />;
 }
 ```
 
