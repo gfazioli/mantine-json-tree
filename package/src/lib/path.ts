@@ -17,7 +17,7 @@ export type JsonTreePathSegments = readonly (string | number)[];
  * key can be any value at all, including an object), so there is no segment
  * that could address them unambiguously.
  */
-function isWritableContainer(value: unknown): value is Record<string, unknown> | unknown[] {
+export function isWritableContainer(value: unknown): value is Record<string, unknown> | unknown[] {
   if (Array.isArray(value)) {
     return true;
   }

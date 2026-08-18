@@ -41,7 +41,7 @@ import {
 } from '@tabler/icons-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
-import { JsonTreeValueEditor } from './JsonTreeValueEditor';
+import { JsonTreeValueEditor, type JsonTreeEditorProps } from './JsonTreeValueEditor';
 import { setValueAtPath, type JsonTreePathSegments } from './lib/path';
 import {
   convertToTreeData,
@@ -309,7 +309,7 @@ export interface JsonTreeBaseProps {
   validate?: (payload: JsonTreeNodePayload) => string | null;
 
   /** Props forwarded to the inline editor input */
-  editorProps?: Record<string, unknown>;
+  editorProps?: JsonTreeEditorProps;
 }
 
 /** Display mode for functions in JSON data */
@@ -389,12 +389,12 @@ interface RenderNodeContext {
   directMatches?: Set<string>;
   /** Serialized segments of the node currently being edited, if any */
   editingKey?: string | null;
-  onStartEdit?: (key: string) => void;
+  onStartEdit?: (key: string, row: HTMLElement | null) => void;
   onCommitEdit?: (node: JSONTreeNodeData, value: unknown) => void;
   onCancelEdit?: () => void;
   isNodeEditable?: (node: JSONTreeNodeData) => boolean;
   validateNode?: (node: JSONTreeNodeData, value: unknown) => string | null;
-  editorProps?: Record<string, unknown>;
+  editorProps?: JsonTreeEditorProps;
 }
 
 function highlightText(
@@ -652,7 +652,10 @@ function renderJSONNode(
                         ctx.onCommitEdit?.(jsonNode, !value);
                         return;
                       }
-                      ctx.onStartEdit?.(editKey);
+                      ctx.onStartEdit?.(
+                        editKey,
+                        event.currentTarget.closest<HTMLElement>('[role="treeitem"]')
+                      );
                     }
                   : undefined
               }
@@ -976,6 +979,26 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Editing state. Only the address of the node being edited lives here — the
   // draft value stays inside the editor, so typing never re-renders the tree.
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  // The row that owns the open editor. When the editor unmounts its input goes
+  // with it and focus falls to the body, which drops a keyboard user out of the
+  // tree entirely — arrow navigation stops working until they tab back in.
+  const editingRowRef = useRef<HTMLElement | null>(null);
+
+  const handleStartEdit = useCallback((key: string, row: HTMLElement | null) => {
+    editingRowRef.current = row;
+    setEditingKey(key);
+  }, []);
+
+  useEffect(() => {
+    if (editingKey !== null) {
+      return;
+    }
+    const row = editingRowRef.current;
+    editingRowRef.current = null;
+    if (row?.isConnected) {
+      row.focus();
+    }
+  }, [editingKey]);
 
   const nodePayload = useCallback((node: JSONTreeNodeData): JsonTreeNodePayload | null => {
     const nd = node.nodeData;
@@ -1232,7 +1255,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
     directMatches: debouncedQuery ? searchResults.directMatches : undefined,
     editingKey,
-    onStartEdit: setEditingKey,
+    onStartEdit: handleStartEdit,
     onCommitEdit: handleCommitEdit,
     onCancelEdit: handleCancelEdit,
     isNodeEditable,

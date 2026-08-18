@@ -1,6 +1,17 @@
-import { NumberInput, TextInput } from '@mantine/core';
+import { NumberInput, TextInput, type NumberInputProps, type TextInputProps } from '@mantine/core';
 import React, { useRef, useState } from 'react';
 import type { ValueType } from './lib/utils';
+
+/**
+ * Props forwarded to the inline editor input.
+ *
+ * The props the editor owns are excluded: `value`, `defaultValue` and `onChange`
+ * drive the draft, and `error` carries the validation message.
+ */
+export type JsonTreeEditorProps = Omit<
+  TextInputProps & NumberInputProps,
+  'value' | 'defaultValue' | 'onChange' | 'error'
+>;
 
 export interface JsonTreeValueEditorProps {
   /** The value being edited */
@@ -18,8 +29,8 @@ export interface JsonTreeValueEditorProps {
   /** Returns an error message to reject the value, or null to accept it */
   validate?: (value: unknown) => string | null;
 
-  /** Styles API props for the input */
-  editorProps?: Record<string, unknown>;
+  /** Props forwarded to the input */
+  editorProps?: JsonTreeEditorProps;
 }
 
 /**
@@ -55,6 +66,15 @@ export function JsonTreeValueEditor({
   const commit = () => {
     if (committedRef.current) {
       return;
+    }
+
+    if (type === 'number') {
+      // NumberInput reports an empty field as '', and Number('') is 0 — committing
+      // that would write a zero the user never typed while trying to clear it
+      if (draft === '' || draft === null || draft === undefined) {
+        setError('Required');
+        return;
+      }
     }
 
     const next = parse();
@@ -93,15 +113,32 @@ export function JsonTreeValueEditor({
     }
   };
 
+  // `editorProps` is spread first, and the editor's own handlers then wrap the
+  // consumer's rather than being replaced by them. Spreading it last let a
+  // consumer `onKeyDown` overwrite the guard above, at which point Mantine's Tree
+  // reclaims the arrow keys and Space and the field stops accepting spaces —
+  // exactly the failure the guard exists to prevent.
   const shared = {
+    ...editorProps,
     autoFocus: true,
     error,
-    size: 'xs' as const,
-    onKeyDown: handleKeyDown,
-    onClick: (event: React.MouseEvent) => event.stopPropagation(),
-    onMouseDown: (event: React.MouseEvent) => event.stopPropagation(),
-    onBlur: commit,
-    ...editorProps,
+    size: editorProps?.size ?? ('xs' as const),
+    onKeyDown: (event: React.KeyboardEvent) => {
+      editorProps?.onKeyDown?.(event as React.KeyboardEvent<HTMLInputElement>);
+      handleKeyDown(event);
+    },
+    onClick: (event: React.MouseEvent) => {
+      editorProps?.onClick?.(event as React.MouseEvent<HTMLInputElement>);
+      event.stopPropagation();
+    },
+    onMouseDown: (event: React.MouseEvent) => {
+      editorProps?.onMouseDown?.(event as React.MouseEvent<HTMLInputElement>);
+      event.stopPropagation();
+    },
+    onBlur: (event: React.FocusEvent) => {
+      editorProps?.onBlur?.(event as React.FocusEvent<HTMLInputElement>);
+      commit();
+    },
   };
 
   if (type === 'number') {

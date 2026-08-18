@@ -130,6 +130,13 @@
     outline-color: var(--json-tree-color-editable-outline);
   }
 
+  /* A keyboard user focuses the row, never the value cell, so :hover alone would
+     leave the Enter-to-edit affordance invisible to them. */
+  :global(li[role='treeitem']:focus) &[data-editable],
+  :global(li[role='treeitem']:focus-visible) &[data-editable] {
+    outline-color: var(--json-tree-color-editable-outline);
+  }
+
   /* A boolean has exactly one other state, so clicking it toggles rather than
      opening an editor — the cursor says so. */
   &[data-editable][data-type='boolean'] {

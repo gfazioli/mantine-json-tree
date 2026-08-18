@@ -52,6 +52,16 @@ opens its editor too, so the whole flow works from the keyboard without adding a
 `JsonTree` is **controlled** while editing: it never keeps its own copy of your data. `onChange`
 hands you the next value, and it only takes effect once you feed it back through `data`.
 
+`data` is typed `unknown`, so `onChange` hands the next value back as `unknown` too. Editing a
+value never changes the shape of the object — a string stays a string, a number a number — so
+casting it back to your own type is safe:
+
+```tsx
+const [data, setData] = useState<Profile>(initial);
+
+<JsonTree data={data} editable onChange={(next) => setData(next as Profile)} />
+```
+
 The original object is never mutated. Only the spine down to the edited node is rebuilt, so every
 `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element elsewhere in the tree keeps
 its identity — a `structuredClone` or a JSON round-trip would flatten or destroy all of them.
