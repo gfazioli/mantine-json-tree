@@ -1,12 +1,10 @@
 import { JsonTree } from '@gfazioli/mantine-json-tree';
 import { Paper, Stack } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
-import { dataCode } from './data';
 
 const code = `
 import { JsonTree } from "@gfazioli/mantine-json-tree";
 import { Paper, Stack } from '@mantine/core';
-import { data } from './data';
 
 function Demo() {
   return (
@@ -47,7 +45,9 @@ function Demo() {
         <JsonTree data={42} defaultExpanded title="Number value" />
       </Paper>
       <Paper withBorder>
-        <JsonTree data defaultExpanded title="Boolean value (true)" />
+        {/* eslint-disable-next-line react/jsx-boolean-value -- the shorthand `data` reads as
+            a forgotten prop in a docs snippet, and the explicit value is this row's point */}
+        <JsonTree data={true} defaultExpanded title="Boolean value (true)" />
       </Paper>
       <Paper withBorder>
         <JsonTree data={false} defaultExpanded title="Boolean value (false)" />
@@ -76,9 +76,6 @@ function Demo() {
 export const values: MantineDemo = {
   type: 'code',
   component: Demo,
-  code: [
-    { fileName: 'Demo.tsx', code, language: 'tsx' },
-    { fileName: 'data.ts', code: dataCode, language: 'tsx' },
-  ],
+  code,
   defaultExpanded: false,
 };
