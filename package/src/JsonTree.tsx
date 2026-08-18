@@ -49,6 +49,7 @@ import {
   getItemCount,
   isExpandable,
   searchTree,
+  stringifyValue,
   type JSONTreeNodeData,
   type ValueType,
 } from './lib/utils';
@@ -435,7 +436,7 @@ function renderJSONNode(
   const handleCopy = async (e: React.MouseEvent): Promise<boolean> => {
     e.stopPropagation();
     try {
-      const copy = JSON.stringify(value, null, 2);
+      const copy = stringifyValue(value);
       await navigator.clipboard.writeText(copy);
       onCopy?.(copy, value);
       return true;
@@ -887,13 +888,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       }
 
       e.preventDefault();
+      const copy = stringifyValue(nodeData.nodeData.value);
       try {
-        const copy = JSON.stringify(nodeData.nodeData.value, null, 2);
         await navigator.clipboard.writeText(copy);
         onCopy?.(copy, nodeData.nodeData.value);
       } catch {
-        // Clipboard write may fail silently in unsupported contexts, and
-        // JSON.stringify throws on circular data
+        // Clipboard write may fail silently in unsupported contexts
       }
     },
     [withCopyToClipboard, treeData, onCopy]
@@ -985,8 +985,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Global copy handler with visual feedback
   const [copiedAll, setCopiedAll] = useState(false);
   const handleCopyAll = useCallback(async () => {
+    const json = stringifyValue(data);
     try {
-      const json = JSON.stringify(data, null, 2);
       await navigator.clipboard.writeText(json);
       onCopyAll?.(json);
       onCopy?.(json, data);
