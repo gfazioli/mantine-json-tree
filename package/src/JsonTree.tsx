@@ -41,6 +41,8 @@ import {
 } from '@tabler/icons-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
+import { JsonTreeValueEditor } from './JsonTreeValueEditor';
+import { setValueAtPath, type JsonTreePathSegments } from './lib/path';
 import {
   convertToTreeData,
   filterTreeBySearch,
@@ -76,7 +78,8 @@ export type JsonTreeStylesNames =
   | 'itemsCount'
   | 'indentGuide'
   | 'copyButton'
-  | 'lineNumber';
+  | 'lineNumber'
+  | 'valueEditor';
 
 export type JsonTreeCssVariables = {
   root: '--json-tree-font-family' | '--json-tree-font-size';
@@ -97,7 +100,8 @@ export type JsonTreeCssVariables = {
     | '--json-tree-color-regexp'
     | '--json-tree-color-map'
     | '--json-tree-color-set'
-    | '--json-tree-color-circular';
+    | '--json-tree-color-circular'
+    | '--json-tree-color-editable-outline';
   bracket: '--json-tree-color-bracket';
   indentGuide:
     | '--json-tree-indent-guide-color-0'
@@ -120,6 +124,7 @@ export type JsonTreeCssVariables = {
   searchBar: never;
   searchInput: never;
   searchHighlight: '--json-tree-search-highlight-color';
+  valueEditor: never;
 };
 
 export interface JsonTreeBaseProps {
@@ -266,10 +271,72 @@ export interface JsonTreeBaseProps {
    * ```
    */
   searchInputProps?: Omit<TextInputProps, 'value' | 'defaultValue' | 'onChange'>;
+
+  /**
+   * Whether primitive values can be edited in place.
+   *
+   * `JsonTree` is controlled while editing: it never holds a copy of your data,
+   * so `onChange` must be wired up and its value fed back through `data` for an
+   * edit to stick.
+   *
+   * @default false
+   */
+  editable?: boolean;
+
+  /**
+   * Called after a value is committed, with the next data and a description of
+   * what changed. The original object is never mutated: only the spine down to
+   * the edited node is rebuilt, so `Date`, `Map`, `Set`, `RegExp`, `BigInt`,
+   * functions and React elements elsewhere in the tree keep their identity.
+   */
+  onChange?: (value: unknown, change: JsonTreeChange) => void;
+
+  /**
+   * Which value types are editable.
+   *
+   * Everything outside this list stays read-only, which is why `Map` and `Set`
+   * entries can never be edited: their keys are synthetic (a `Map` key can be
+   * any value at all) and so cannot be addressed for a write.
+   *
+   * @default ['string', 'number', 'boolean']
+   */
+  editableTypes?: JsonTreeEditableType[];
+
+  /** Return `false` to keep an individual node read-only while `editable` is on */
+  isEditable?: (payload: JsonTreeNodePayload) => boolean;
+
+  /** Return an error message to reject an edit, or `null` to accept it */
+  validate?: (payload: JsonTreeNodePayload) => string | null;
+
+  /** Props forwarded to the inline editor input */
+  editorProps?: Record<string, unknown>;
 }
 
 /** Display mode for functions in JSON data */
 export type JsonTreeFunctionDisplay = 'as-string' | 'hide' | 'as-object';
+
+/** Value types that in-place editing can handle */
+export type JsonTreeEditableType = 'string' | 'number' | 'boolean';
+
+/** Everything known about the node an editing callback is being asked about */
+export interface JsonTreeNodePayload {
+  /** Display path, e.g. `root.address.city`. Not unique — see `pathSegments` */
+  path: string;
+  /** The node's address, one step per level. Object keys are strings, array indices numbers */
+  pathSegments: JsonTreePathSegments;
+  /** The key this value is stored under, absent on the root */
+  key?: string;
+  /** The node's value type */
+  type: ValueType;
+  /** The node's current value */
+  value: unknown;
+}
+
+/** Describes a committed edit */
+export interface JsonTreeChange extends JsonTreeNodePayload {
+  /** The value the node held before the edit */
+  previousValue: unknown;
+}
 
 export interface JsonTreeProps
   extends BoxProps, JsonTreeBaseProps, StylesApiProps<JsonTreeFactory> {}
@@ -305,6 +372,8 @@ export const defaultProps: Partial<JsonTreeProps> = {
   searchIcon: <IconSearch size={16} />,
   searchPlaceholder: 'Filter keys and values...',
   searchDebounce: 300,
+  editable: false,
+  editableTypes: ['string', 'number', 'boolean'],
 };
 
 interface RenderNodeContext {
@@ -318,6 +387,14 @@ interface RenderNodeContext {
   searchQuery?: string;
   matchedPaths?: Set<string>;
   directMatches?: Set<string>;
+  /** Serialized segments of the node currently being edited, if any */
+  editingKey?: string | null;
+  onStartEdit?: (key: string) => void;
+  onCommitEdit?: (node: JSONTreeNodeData, value: unknown) => void;
+  onCancelEdit?: () => void;
+  isNodeEditable?: (node: JSONTreeNodeData) => boolean;
+  validateNode?: (node: JSONTreeNodeData, value: unknown) => string | null;
+  editorProps?: Record<string, unknown>;
 }
 
 function highlightText(
@@ -416,6 +493,7 @@ function renderJSONNode(
     path,
     itemCount,
     depth = 0,
+    pathSegments,
   } = jsonNode.nodeData || {
     type: 'null' as ValueType,
     value: null,
@@ -537,8 +615,48 @@ function renderJSONNode(
         )}
         {(() => {
           const formattedValue = formatValue(value, type);
+          // Segments, not the display path: two different nodes can share a path
+          // string, and editing must never be ambiguous about which one it means.
+          const editKey = pathSegments ? JSON.stringify(pathSegments) : null;
+          const isEditable = editKey !== null && (ctx.isNodeEditable?.(jsonNode) ?? false);
+
+          if (isEditable && ctx.editingKey === editKey) {
+            return (
+              <Box {...getStyles('valueEditor')}>
+                <JsonTreeValueEditor
+                  value={value}
+                  type={type}
+                  editorProps={ctx.editorProps}
+                  validate={(next) => ctx.validateNode?.(jsonNode, next) ?? null}
+                  onCommit={(next) => ctx.onCommitEdit?.(jsonNode, next)}
+                  onCancel={() => ctx.onCancelEdit?.()}
+                />
+              </Box>
+            );
+          }
+
           return (
-            <Code {...getStyles('value')} data-type={type} data-value={formattedValue}>
+            <Code
+              {...getStyles('value')}
+              data-type={type}
+              data-value={formattedValue}
+              data-editable={isEditable || undefined}
+              data-edit-key={isEditable ? editKey : undefined}
+              onClick={
+                isEditable
+                  ? (event: React.MouseEvent) => {
+                      event.stopPropagation();
+                      if (type === 'boolean') {
+                        // a boolean has exactly one other state, so there is
+                        // nothing to type: toggle it and skip the editor
+                        ctx.onCommitEdit?.(jsonNode, !value);
+                        return;
+                      }
+                      ctx.onStartEdit?.(editKey);
+                    }
+                  : undefined
+              }
+            >
               {ctx.searchQuery
                 ? highlightText(formattedValue, ctx.searchQuery, getStyles)
                 : formattedValue}
@@ -691,6 +809,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-color-map': 'var(--mantine-color-grape-7)',
         '--json-tree-color-set': 'var(--mantine-color-grape-7)',
         '--json-tree-color-circular': 'var(--mantine-color-red-6)',
+        '--json-tree-color-editable-outline': 'var(--mantine-color-blue-5)',
       },
       bracket: { '--json-tree-color-bracket': 'var(--mantine-color-gray-5)' },
       indentGuide: {
@@ -717,6 +836,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       searchHighlight: {
         '--json-tree-search-highlight-color': 'var(--mantine-color-yellow-3)',
       },
+      valueEditor: {},
     };
   }
 );
@@ -767,6 +887,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     onSearchChange,
     searchDebounce,
     searchInputProps,
+    editable,
+    onChange,
+    editableTypes,
+    isEditable,
+    validate,
+    editorProps,
 
     classNames,
     style,
@@ -845,9 +971,104 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tree.setExpandedState changes on every render; using tree would cause infinite loop
   }, [controlledExpanded]);
 
+  // Editing state. Only the address of the node being edited lives here — the
+  // draft value stays inside the editor, so typing never re-renders the tree.
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const nodePayload = useCallback((node: JSONTreeNodeData): JsonTreeNodePayload | null => {
+    const nd = node.nodeData;
+    if (!nd?.pathSegments) {
+      return null;
+    }
+    return {
+      path: nd.path,
+      pathSegments: nd.pathSegments,
+      key: nd.key,
+      type: nd.type,
+      value: nd.value,
+    };
+  }, []);
+
+  const isNodeEditable = useCallback(
+    (node: JSONTreeNodeData) => {
+      if (!editable) {
+        return false;
+      }
+      const payload = nodePayload(node);
+      if (!payload) {
+        // Map and Set entries, and function properties expanded as an object,
+        // have no address that could be written back
+        return false;
+      }
+      if (!(editableTypes ?? []).includes(payload.type as JsonTreeEditableType)) {
+        return false;
+      }
+      return isEditable?.(payload) ?? true;
+    },
+    [editable, editableTypes, isEditable, nodePayload]
+  );
+
+  const validateNode = useCallback(
+    (node: JSONTreeNodeData, nextValue: unknown) => {
+      if (!validate) {
+        return null;
+      }
+      const payload = nodePayload(node);
+      return payload ? validate({ ...payload, value: nextValue }) : null;
+    },
+    [validate, nodePayload]
+  );
+
+  const handleCommitEdit = useCallback(
+    (node: JSONTreeNodeData, nextValue: unknown) => {
+      setEditingKey(null);
+
+      const payload = nodePayload(node);
+      if (!payload || Object.is(payload.value, nextValue)) {
+        return;
+      }
+
+      const nextData = setValueAtPath(data, payload.pathSegments, nextValue);
+      onChange?.(nextData, { ...payload, value: nextValue, previousValue: payload.value });
+    },
+    [data, onChange, nodePayload]
+  );
+
+  const handleCancelEdit = useCallback(() => setEditingKey(null), []);
+
+  useEffect(() => {
+    // The most likely way to get this wrong is to switch `editable` on and see
+    // edits silently revert: JsonTree is controlled and holds no copy of the data.
+    if (process.env.NODE_ENV !== 'production' && editable && !onChange) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'JsonTree: `editable` is set but `onChange` is missing, so edits cannot be kept. ' +
+          'JsonTree does not hold its own copy of the data — feed the value from `onChange` back through `data`.'
+      );
+    }
+  }, [editable, onChange]);
+
   // Keyboard handler for Ctrl+C copy on focused node
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
+      // Enter edits the focused row. Routing it through the cell's own click
+      // keeps one code path for mouse and keyboard — and, more importantly,
+      // avoids giving every value its own tab stop just to be reachable.
+      if (editable && e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const row = (document.activeElement as HTMLElement | null)?.closest?.('[role="treeitem"]');
+        if (row && (e.currentTarget as HTMLElement).contains(row)) {
+          const cell = Array.from(row.querySelectorAll<HTMLElement>('[data-edit-key]')).find(
+            // querySelectorAll reaches into nested rows; keep only this row's own cell
+            (el) => el.closest('[role="treeitem"]') === row
+          );
+          if (cell) {
+            e.preventDefault();
+            cell.click();
+            return;
+          }
+        }
+      }
+
       if (!withCopyToClipboard || !(e.metaKey || e.ctrlKey) || e.key !== 'c') {
         return;
       }
@@ -896,7 +1117,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         // Clipboard write may fail silently in unsupported contexts
       }
     },
-    [withCopyToClipboard, treeData, onCopy]
+    [withCopyToClipboard, treeData, onCopy, editable]
   );
 
   // Key count for badge
@@ -1008,6 +1229,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     searchQuery: debouncedQuery || undefined,
     matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
     directMatches: debouncedQuery ? searchResults.directMatches : undefined,
+    editingKey,
+    onStartEdit: setEditingKey,
+    onCommitEdit: handleCommitEdit,
+    onCancelEdit: handleCancelEdit,
+    isNodeEditable,
+    validateNode,
+    editorProps,
   };
 
   const treeComponent = (

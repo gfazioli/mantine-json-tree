@@ -1,5 +1,6 @@
 import { type TreeNodeData } from '@mantine/core';
 import type { JsonTreeFunctionDisplay } from '../JsonTree';
+import type { JsonTreePathSegments } from './path';
 
 export interface JSONTreeNodeData extends TreeNodeData {
   nodeData?: {
@@ -9,6 +10,21 @@ export interface JSONTreeNodeData extends TreeNodeData {
     path: string;
     itemCount?: number;
     depth?: number;
+    /**
+     * The node's address as separate steps, or `undefined` when it has none.
+     *
+     * `path` is a display label — it joins keys with dots, so `{ 'a.b': 1 }` and
+     * `{ a: { b: 1 } }` collide on `root.a.b`, and an array index reads the same
+     * as a numeric object key. Segments keep the steps apart, which is what
+     * makes a write land where it was aimed.
+     *
+     * `undefined` marks a node that cannot be addressed at all: everything under
+     * a `Map` or `Set` (their entries are rendered under a synthetic display key)
+     * and everything under a function expanded via `displayFunctions:
+     * 'as-object'` (those properties belong to a synthetic object that does not
+     * exist in the data).
+     */
+    pathSegments?: JsonTreePathSegments;
   };
 }
 
@@ -280,9 +296,15 @@ export function convertToTreeData(
   path: string = 'root',
   depth: number = 0,
   displayFunctions: JsonTreeFunctionDisplay = 'as-string',
-  ancestors: readonly unknown[] = []
+  ancestors: readonly unknown[] = [],
+  // `null` marks an unaddressable subtree. It cannot be `undefined`: passing
+  // `undefined` to a parameter with a default re-triggers that default, which
+  // would silently hand every Map/Set child a valid-looking address.
+  segments: JsonTreePathSegments | null = []
 ): JSONTreeNodeData {
   const type = getValueType(value);
+  // `null` is the internal sentinel; the public shape uses `undefined`
+  const pathSegments = segments ?? undefined;
 
   // Guard against reference cycles, which would otherwise recurse until the
   // stack blows (`obj.self = obj` is routine in debug panels and object graphs).
@@ -293,7 +315,7 @@ export function convertToTreeData(
     return {
       value: path,
       label: key ?? path,
-      nodeData: { type: 'circular', value, key, path, depth },
+      nodeData: { type: 'circular', value, key, path, depth, pathSegments },
     };
   }
 
@@ -302,7 +324,7 @@ export function convertToTreeData(
     return {
       value: path,
       label: key ?? path,
-      nodeData: { type, value, key, path, depth },
+      nodeData: { type, value, key, path, depth, pathSegments },
     };
   }
 
@@ -318,7 +340,7 @@ export function convertToTreeData(
     return {
       value: path,
       label: key ?? path,
-      nodeData: { type, value, key, path, depth },
+      nodeData: { type, value, key, path, depth, pathSegments },
     };
   }
 
@@ -333,7 +355,7 @@ export function convertToTreeData(
       return {
         value: path,
         label: key ?? path,
-        nodeData: { type, value, key, path, depth },
+        nodeData: { type, value, key, path, depth, pathSegments },
       };
     }
     // displayFunctions === 'as-object': treat function as object to show its properties
@@ -344,10 +366,16 @@ export function convertToTreeData(
       },
       {} as Record<string, any>
     );
-    return convertToTreeData(functionProps, key, path, depth, displayFunctions, [
-      ...ancestors,
-      value,
-    ]);
+    return convertToTreeData(
+      functionProps,
+      key,
+      path,
+      depth,
+      displayFunctions,
+      [...ancestors, value],
+      // these properties belong to a synthetic object, so none of them is addressable
+      null
+    );
   }
 
   const expandable = isExpandable(value);
@@ -357,29 +385,48 @@ export function convertToTreeData(
     return {
       value: nodeValue,
       label: key ?? path,
-      nodeData: { type, value, key, path, depth },
+      nodeData: { type, value, key, path, depth, pathSegments },
     };
   }
 
-  let entries: [string, any][] = [];
+  // [display key, value, addressable segment]. The segment is `undefined` where
+  // the entry cannot be addressed: a Map key can be any value at all, and a Set
+  // has no keys, so their display keys are synthetic and cannot be written back.
+  let entries: [string, any, string | number | undefined][] = [];
   if (type === 'array') {
-    entries = value.map((item: any, index: number) => [String(index), item] as [string, any]);
+    entries = value.map(
+      (item: any, index: number) =>
+        [String(index), item, index] as [string, any, string | number | undefined]
+    );
   } else if (type === 'map') {
     entries = Array.from(value.entries() as Iterable<[any, any]>).map(
-      ([k, v]: [any, any], index: number) => [`[${index}] ${String(k)}`, v] as [string, any]
+      ([k, v]: [any, any], index: number) =>
+        [`[${index}] ${String(k)}`, v, undefined] as [string, any, string | number | undefined]
     );
   } else if (type === 'set') {
     entries = Array.from(value.values()).map(
-      (item: any, index: number) => [String(index), item] as [string, any]
+      (item: any, index: number) =>
+        [String(index), item, undefined] as [string, any, string | number | undefined]
     );
   } else {
-    entries = Object.entries(value);
+    entries = Object.entries(value).map(
+      ([k, v]) => [k, v, k] as [string, any, string | number | undefined]
+    );
   }
 
   const childAncestors = [...ancestors, value];
   const children = entries
-    .map(([k, v]) =>
-      convertToTreeData(v, k, `${path}.${k}`, depth + 1, displayFunctions, childAncestors)
+    .map(([k, v, segment]) =>
+      convertToTreeData(
+        v,
+        k,
+        `${path}.${k}`,
+        depth + 1,
+        displayFunctions,
+        childAncestors,
+        // an unaddressable step makes the whole subtree below it unaddressable
+        segments === null || segment === undefined ? null : [...segments, segment]
+      )
     )
     .filter((node) => node !== null); // Filter out hidden functions
 
@@ -387,7 +434,15 @@ export function convertToTreeData(
     value: nodeValue,
     label: key ?? path,
     children,
-    nodeData: { type, value, key, path, itemCount: getItemCount(value), depth },
+    nodeData: {
+      type,
+      value,
+      key,
+      path,
+      itemCount: getItemCount(value),
+      depth,
+      pathSegments,
+    },
   };
 }
 

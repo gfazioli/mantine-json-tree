@@ -16,6 +16,7 @@ import * as demos from './demos';
 - Controlled expand/collapse state (`expanded`, `onExpandedChange`)
 - `onExpand` and `onCollapse` callbacks for individual node toggling
 - Keyboard copy: `Ctrl+C` / `Cmd+C` copies the focused node when `withCopyToClipboard` is enabled
+- **Editable values** — click a string, number or boolean to edit it in place (`editable`, `onChange`)
 - **Circular references** are detected and marked instead of crashing the component
 - Responsive `size` prop via Mantine breakpoint objects (CSS-native, no re-renders)
 
@@ -73,6 +74,57 @@ raw JSON data without the `rootName` wrapper. The
 `rootName` is a display-only label and is not included
 in the copied output. This makes the copied JSON
 directly usable in code and API tools.
+
+## Editing Values
+
+Set `editable` to let a reader change a value in place. Click a string or a number to open an
+inline editor — `Enter` commits, `Escape` cancels, moving focus commits — or click a boolean to
+toggle it outright, since it has exactly one other state to move to. With a row focused, `Enter`
+opens its editor too, so the whole flow works from the keyboard without adding a tab stop per value.
+
+`JsonTree` is **controlled** while editing: it never keeps its own copy of your data. `onChange`
+hands you the next value, and it only takes effect once you feed it back through `data`.
+
+The original object is never mutated. Only the spine down to the edited node is rebuilt, so every
+`Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element elsewhere in the tree keeps
+its identity — a `structuredClone` or a JSON round-trip would flatten or destroy all of them.
+
+<Demo data={demos.editable} />
+
+### What can be edited
+
+`editableTypes` defaults to `['string', 'number', 'boolean']`; anything outside it stays read-only.
+Two kinds of node can never be edited, whatever you put in that list:
+
+- **`Map` and `Set` entries.** They are displayed under a synthetic key — a `Map` key can be any
+  value at all, including an object — so there is no address to write back to.
+- **Function properties expanded with `displayFunctions="as-object"`.** Those properties belong to
+  a synthetic object that does not exist in your data.
+
+`isEditable` gates individual nodes, and `validate` rejects a value by returning a message:
+
+```tsx
+<JsonTree
+  data={data}
+  editable
+  onChange={setData}
+  isEditable={({ path, type }) => path !== 'root.id'}
+  validate={({ value }) => (String(value).trim() === '' ? 'Cannot be empty' : null)}
+/>
+```
+
+### Addressing a node
+
+`onChange` receives a change object carrying both ways of naming the node:
+
+- `path` — the display label, e.g. `root.address.city`. It is **not unique**: `{ 'a.b': 1 }` and
+  `{ a: { b: 1 } }` both produce `root.a.b`, and an array index reads the same as a numeric object
+  key.
+- `pathSegments` — the real address, one step per level, with object keys as strings and array
+  indices as numbers. This is what the write is performed against, so an edit always lands on the
+  node you clicked.
+
+Use `path` for display and logging; use `pathSegments` whenever you need to act on the node.
 
 ## Root Name
 

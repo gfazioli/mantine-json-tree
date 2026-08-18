@@ -114,6 +114,33 @@
     color: var(--json-tree-color-circular);
     font-style: italic;
   }
+
+  /* Editable values advertise themselves on hover rather than permanently, so a
+     read-heavy tree does not turn into a wall of input boxes. */
+  &[data-editable] {
+    cursor: text;
+    outline: 1px dashed transparent;
+    outline-offset: 1px;
+    transition:
+      outline-color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  &[data-editable]:hover {
+    outline-color: var(--json-tree-color-editable-outline);
+  }
+
+  /* A boolean has exactly one other state, so clicking it toggles rather than
+     opening an editor — the cursor says so. */
+  &[data-editable][data-type='boolean'] {
+    cursor: pointer;
+  }
+}
+
+.valueEditor {
+  display: inline-flex;
+  min-width: 120px;
+  max-width: 320px;
 }
 
 .bracket {

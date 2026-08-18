@@ -1,6 +1,7 @@
 import { render } from '@mantine-tests/core';
 import { Loader } from '@mantine/core';
 import { fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { JsonTree } from './JsonTree';
 
@@ -708,6 +709,306 @@ describe('JsonTree', () => {
 
       await waitFor(() => expect(writeText).toHaveBeenCalled());
       expect(writeText.mock.calls[0][0]).toContain('"self": "[Circular]"');
+    });
+  });
+  describe('addressable paths', () => {
+    const { convertToTreeData } = require('./lib/utils');
+    const { setValueAtPath } = require('./lib/path');
+
+    const findByPath = (node: any, path: string): any => {
+      if (node.nodeData?.path === path) {
+        return node;
+      }
+      for (const child of node.children ?? []) {
+        const hit = findByPath(child, path);
+        if (hit) {
+          return hit;
+        }
+      }
+      return null;
+    };
+    const collect = (node: any, out: any[] = []): any[] => {
+      out.push(node);
+      (node.children ?? []).forEach((c: any) => collect(c, out));
+      return out;
+    };
+
+    it('addresses object keys and array indices, indices as numbers', () => {
+      const tree = convertToTreeData({ address: { city: 'X' }, courses: ['a'] }, 'root', 'root');
+
+      expect(tree.nodeData.pathSegments).toEqual([]);
+      expect(findByPath(tree, 'root.address.city').nodeData.pathSegments).toEqual([
+        'address',
+        'city',
+      ]);
+      // a numeric segment marks an array index, a string marks an object key
+      expect(findByPath(tree, 'root.courses.0').nodeData.pathSegments).toEqual(['courses', 0]);
+    });
+
+    it('separates a dotted key from a nested object that share a path string', () => {
+      const tree = convertToTreeData({ 'a.b': 1, a: { b: 2 } }, 'root', 'root');
+      const colliding = collect(tree).filter((n: any) => n.nodeData?.path === 'root.a.b');
+
+      // the display path cannot tell them apart — that is the whole point
+      expect(colliding).toHaveLength(2);
+      expect(colliding.map((n: any) => n.nodeData.pathSegments)).toEqual([['a.b'], ['a', 'b']]);
+    });
+
+    it('leaves Map and Set entries unaddressable', () => {
+      const tree = convertToTreeData(
+        { m: new Map<any, any>([[{ id: 1 }, 'v']]), s: new Set(['v']) },
+        'root',
+        'root'
+      );
+      const unaddressable = collect(tree).filter(
+        (n: any) => n.nodeData?.pathSegments === undefined
+      );
+
+      // a Map key can be any value, a Set has no keys: neither can be written back
+      expect(unaddressable.length).toBe(2);
+      expect(findByPath(tree, 'root.m').nodeData.pathSegments).toEqual(['m']);
+    });
+
+    it('leaves function properties unaddressable when expanded as an object', () => {
+      const fn = function handleClick() {};
+      (fn as any).meta = 'x';
+      const tree = convertToTreeData({ fn }, 'root', 'root', 0, 'as-object');
+
+      const meta = collect(tree).find((n: any) => n.nodeData?.key === 'meta');
+      // the properties belong to a synthetic object that is not in the data
+      expect(meta.nodeData.pathSegments).toBeUndefined();
+    });
+
+    it('round-trips: a node address written back lands on that node', () => {
+      const data = { 'a.b': 'dotted', a: { b: 'nested' }, list: ['x', 'y'] };
+      const tree = convertToTreeData(data, 'root', 'root');
+      const colliding = collect(tree).filter((n: any) => n.nodeData?.path === 'root.a.b');
+
+      const afterDotted = setValueAtPath(data, colliding[0].nodeData.pathSegments, 'EDITED');
+      expect(afterDotted).toEqual({ 'a.b': 'EDITED', a: { b: 'nested' }, list: ['x', 'y'] });
+
+      const afterNested = setValueAtPath(data, colliding[1].nodeData.pathSegments, 'EDITED');
+      expect(afterNested).toEqual({ 'a.b': 'dotted', a: { b: 'EDITED' }, list: ['x', 'y'] });
+
+      const item = findByPath(tree, 'root.list.1');
+      const afterItem: any = setValueAtPath(data, item.nodeData.pathSegments, 'EDITED');
+      expect(afterItem.list).toEqual(['x', 'EDITED']);
+      expect(Array.isArray(afterItem.list)).toBe(true);
+    });
+  });
+  describe('editable values', () => {
+    const cell = (container: HTMLElement, path: string) =>
+      container.querySelector<HTMLElement>(
+        `li[role="treeitem"][data-value="${path}"] [data-type]`
+      )!;
+    const input = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input')!;
+
+    const setup = (props: any = {}, data: any = { name: 'John', age: 30, isAdmin: false }) => {
+      const onChange = jest.fn();
+      const utils = render(
+        <JsonTree data={data} defaultExpanded maxDepth={-1} onChange={onChange} {...props} />
+      );
+      return { ...utils, onChange };
+    };
+
+    it('is read-only until editable is set', () => {
+      const { container, onChange } = setup();
+      fireEvent.click(cell(container, 'root.name'));
+      expect(container.querySelector('input')).toBeNull();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('opens an editor when an editable value is clicked', () => {
+      const { container } = setup({ editable: true });
+      expect(cell(container, 'root.name').getAttribute('data-editable')).toBe('true');
+      fireEvent.click(cell(container, 'root.name'));
+      expect(input(container).value).toBe('John');
+    });
+
+    it('commits on Enter with the next data and a change payload', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'Jane{Enter}');
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      const [nextData, change] = onChange.mock.calls[0];
+      expect(nextData).toEqual({ name: 'Jane', age: 30, isAdmin: false });
+      expect(change).toMatchObject({
+        path: 'root.name',
+        pathSegments: ['name'],
+        key: 'name',
+        type: 'string',
+        previousValue: 'John',
+        value: 'Jane',
+      });
+    });
+
+    it('types spaces and moves the caret with arrows inside the editor', async () => {
+      // Mantine's Tree preventDefaults Space and the arrow keys on the row above;
+      // without the editor stopping propagation the field stays empty
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'a b c');
+      expect(input(container).value).toBe('a b c');
+
+      await user.keyboard('{ArrowLeft}{ArrowLeft}X');
+      expect(input(container).value).toBe('a bX c');
+      expect(document.activeElement).toBe(input(container));
+
+      await user.keyboard('{Enter}');
+      expect(onChange.mock.calls[0][0]).toEqual({ name: 'a bX c', age: 30, isAdmin: false });
+    });
+
+    it('cancels on Escape without reporting a change', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'Jane{Escape}');
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(container.querySelector('input')).toBeNull();
+    });
+
+    it('commits on blur', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'Jane');
+      fireEvent.blur(input(container));
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange.mock.calls[0][0]).toEqual({ name: 'Jane', age: 30, isAdmin: false });
+    });
+
+    it('edits a number as a number, not a string', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.age'));
+      await user.clear(input(container));
+      await user.type(input(container), '31{Enter}');
+
+      expect(onChange.mock.calls[0][0].age).toBe(31);
+    });
+
+    it('toggles a boolean on click without opening an editor', () => {
+      const { container, onChange } = setup({ editable: true });
+
+      fireEvent.click(cell(container, 'root.isAdmin'));
+
+      expect(container.querySelector('input')).toBeNull();
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange.mock.calls[0][0].isAdmin).toBe(true);
+    });
+
+    it('honours editableTypes', () => {
+      const { container } = setup({ editable: true, editableTypes: ['string'] });
+      expect(cell(container, 'root.name').getAttribute('data-editable')).toBe('true');
+      expect(cell(container, 'root.age').getAttribute('data-editable')).toBeNull();
+    });
+
+    it('honours the isEditable gate', () => {
+      const { container } = setup({
+        editable: true,
+        isEditable: ({ path }: any) => path !== 'root.name',
+      });
+      expect(cell(container, 'root.name').getAttribute('data-editable')).toBeNull();
+      expect(cell(container, 'root.age').getAttribute('data-editable')).toBe('true');
+    });
+
+    it('rejects a value that fails validation', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup({
+        editable: true,
+        validate: ({ value }: any) => (String(value).length === 0 ? 'Required' : null),
+      });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), '{Enter}');
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(container.textContent).toContain('Required');
+      expect(container.querySelector('input')).not.toBeNull();
+    });
+
+    it('never offers to edit a Map or Set entry', () => {
+      const { container } = setup(
+        { editable: true },
+        { m: new Map([['k', 'v']]), s: new Set(['v']), plain: 'yes' }
+      );
+      // their keys are synthetic, so there is no address to write back to
+      const editable = container.querySelectorAll('[data-editable]');
+      expect(editable).toHaveLength(1);
+      expect(editable[0].getAttribute('data-value')).toBe('"yes"');
+    });
+
+    it('writes to the right node when two nodes share a display path', async () => {
+      const user = userEvent.setup();
+      const { container, onChange } = setup(
+        { editable: true },
+        { 'a.b': 'dotted', a: { b: 'nested' } }
+      );
+
+      // both rows render at data-value="root.a.b"
+      const rows = container.querySelectorAll('li[role="treeitem"][data-value="root.a.b"]');
+      expect(rows).toHaveLength(2);
+
+      const nestedCell = rows[1].querySelector<HTMLElement>('[data-editable]')!;
+      await user.click(nestedCell);
+      await user.clear(input(container));
+      await user.type(input(container), 'EDITED{Enter}');
+
+      expect(onChange.mock.calls[0][0]).toEqual({ 'a.b': 'dotted', a: { b: 'EDITED' } });
+      expect(onChange.mock.calls[0][1].pathSegments).toEqual(['a', 'b']);
+    });
+
+    it('keeps non-JSON values elsewhere in the tree intact', async () => {
+      const user = userEvent.setup();
+      const date = new Date('2024-01-15T10:30:00Z');
+      const map = new Map([['k', 'v']]);
+      const { container, onChange } = setup({ editable: true }, { label: 'old', date, map });
+
+      await user.click(cell(container, 'root.label'));
+      await user.clear(input(container));
+      await user.type(input(container), 'new{Enter}');
+
+      const next = onChange.mock.calls[0][0];
+      // identity, not equality — a clone or JSON round-trip would destroy these
+      expect(next.date).toBe(date);
+      expect(next.map).toBe(map);
+    });
+
+    it('opens the editor with Enter on the focused row', async () => {
+      const user = userEvent.setup();
+      const { container } = setup({ editable: true });
+
+      const row = container.querySelector<HTMLElement>(
+        'li[role="treeitem"][data-value="root.name"]'
+      )!;
+      row.focus();
+      await user.keyboard('{Enter}');
+
+      expect(input(container).value).toBe('John');
+    });
+
+    it('adds no tab stop for editable values', () => {
+      // one tab stop for the whole tree, as Mantine intends — a stop per value
+      // would make a large tree impossible to tab past
+      const { container } = setup({ editable: true });
+      const cells = container.querySelectorAll('[data-editable]');
+      expect(cells.length).toBeGreaterThan(0);
+      cells.forEach((c) => expect(c.getAttribute('tabindex')).toBeNull());
     });
   });
 });
