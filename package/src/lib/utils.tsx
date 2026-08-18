@@ -1,6 +1,6 @@
 import { type TreeNodeData } from '@mantine/core';
 import type { JsonTreeFunctionDisplay } from '../JsonTree';
-import type { JsonTreePathSegments } from './path';
+import { isWritableContainer, type JsonTreePathSegments } from './path';
 
 export interface JSONTreeNodeData extends TreeNodeData {
   nodeData?: {
@@ -415,6 +415,11 @@ export function convertToTreeData(
   }
 
   const childAncestors = [...ancestors, value];
+  // Only a plain object or an array can be written into. A class instance is
+  // rendered as an object and would otherwise hand its properties an address
+  // that setValueAtPath refuses — the two rules have to agree, or an edit
+  // throws at commit time instead of never being offered.
+  const childrenAddressable = isWritableContainer(value);
   const children = entries
     .map(([k, v, segment]) =>
       convertToTreeData(
@@ -425,7 +430,9 @@ export function convertToTreeData(
         displayFunctions,
         childAncestors,
         // an unaddressable step makes the whole subtree below it unaddressable
-        segments === null || segment === undefined ? null : [...segments, segment]
+        segments === null || segment === undefined || !childrenAddressable
+          ? null
+          : [...segments, segment]
       )
     )
     .filter((node) => node !== null); // Filter out hidden functions

@@ -1,15 +1,33 @@
-import { JsonTree } from '@gfazioli/mantine-json-tree';
+import { JsonTree, JsonTreeChange } from '@gfazioli/mantine-json-tree';
 import { Paper, Stack, Text } from '@mantine/core';
 import { MantineDemo } from '@mantinex/demo';
+
+interface Profile {
+  name: string;
+  age: number;
+  isAdmin: boolean;
+  createdAt: Date;
+  address: { city: string; zip: string };
+  tags: string[];
+}
 import { useState } from 'react';
 
 const code = `
 import { useState } from 'react';
-import { JsonTree } from "@gfazioli/mantine-json-tree";
+import { JsonTree, JsonTreeChange } from "@gfazioli/mantine-json-tree";
 import { Paper, Stack, Text } from '@mantine/core';
 
+interface Profile {
+  name: string;
+  age: number;
+  isAdmin: boolean;
+  createdAt: Date;
+  address: { city: string; zip: string };
+  tags: string[];
+}
+
 function Demo() {
-  const [data, setData] = useState({
+  const [data, setData] = useState<Profile>({
     name: 'Jamie Chen',
     age: 34,
     isAdmin: false,
@@ -21,7 +39,7 @@ function Demo() {
     tags: ['react', 'mantine'],
   });
 
-  const [lastChange, setLastChange] = useState(null);
+  const [lastChange, setLastChange] = useState<JsonTreeChange | null>(null);
 
   return (
     <Stack>
@@ -33,7 +51,8 @@ function Demo() {
           maxDepth={-1}
           editable
           onChange={(next, change) => {
-            setData(next);
+            // editing a value never changes the shape, so the cast is safe
+            setData(next as Profile);
             setLastChange(change);
           }}
           // zip stays read-only even though its type is editable
@@ -55,7 +74,7 @@ function Demo() {
 `;
 
 function Demo() {
-  const [data, setData] = useState<any>({
+  const [data, setData] = useState<Profile>({
     name: 'Jamie Chen',
     age: 34,
     isAdmin: false,
@@ -67,7 +86,7 @@ function Demo() {
     tags: ['react', 'mantine'],
   });
 
-  const [lastChange, setLastChange] = useState<any>(null);
+  const [lastChange, setLastChange] = useState<JsonTreeChange | null>(null);
 
   return (
     <Stack>
@@ -79,7 +98,8 @@ function Demo() {
           maxDepth={-1}
           editable
           onChange={(next, change) => {
-            setData(next);
+            // editing a value never changes the shape, so the cast is safe
+            setData(next as Profile);
             setLastChange(change);
           }}
           // zip stays read-only even though its type is editable

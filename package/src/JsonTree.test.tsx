@@ -4,6 +4,8 @@ import { fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { JsonTree } from './JsonTree';
+import { setValueAtPath } from './lib/path';
+import { convertToTreeData, filterTreeBySearch, searchTree, stringifyValue } from './lib/utils';
 
 describe('JsonTree', () => {
   it('renders without crashing', () => {
@@ -466,8 +468,6 @@ describe('JsonTree', () => {
 
   describe('search utilities', () => {
     it('searchTree finds matches by key name', () => {
-      const { searchTree } = require('./lib/utils');
-      const { convertToTreeData } = require('./lib/utils');
       const treeData = [convertToTreeData({ name: 'Alice', age: 30 }, 'root', 'root', 0)];
       const result = searchTree(treeData, 'name');
       expect(result.directMatches.size).toBeGreaterThan(0);
@@ -475,14 +475,12 @@ describe('JsonTree', () => {
     });
 
     it('searchTree finds matches by value', () => {
-      const { searchTree, convertToTreeData } = require('./lib/utils');
       const treeData = [convertToTreeData({ name: 'Alice', age: 30 }, 'root', 'root', 0)];
       const result = searchTree(treeData, 'Alice');
       expect(result.directMatches.size).toBeGreaterThan(0);
     });
 
     it('searchTree returns empty for empty query', () => {
-      const { searchTree, convertToTreeData } = require('./lib/utils');
       const treeData = [convertToTreeData({ a: 1 }, 'root', 'root', 0)];
       const result = searchTree(treeData, '');
       expect(result.directMatches.size).toBe(0);
@@ -490,7 +488,6 @@ describe('JsonTree', () => {
     });
 
     it('filterTreeBySearch keeps only matching branches', () => {
-      const { filterTreeBySearch, searchTree, convertToTreeData } = require('./lib/utils');
       const data = { a: { b: 'hello' }, c: { d: 'world' } };
       const treeData = [convertToTreeData(data, 'root', 'root', 0)];
       const { matchedPaths } = searchTree(treeData, 'hello');
@@ -505,7 +502,6 @@ describe('JsonTree', () => {
     });
 
     it('searchTree is case insensitive', () => {
-      const { searchTree, convertToTreeData } = require('./lib/utils');
       const treeData = [convertToTreeData({ Name: 'ALICE' }, 'root', 'root', 0)];
       const result = searchTree(treeData, 'alice');
       expect(result.directMatches.size).toBeGreaterThan(0);
@@ -636,8 +632,6 @@ describe('JsonTree', () => {
     });
   });
   describe('clipboard serialization', () => {
-    const { stringifyValue } = require('./lib/utils');
-
     it('keeps JSON-representable values exactly as JSON.stringify would', () => {
       expect(stringifyValue({ a: 1 })).toBe(JSON.stringify({ a: 1 }, null, 2));
       expect(stringifyValue([1, 'two'])).toBe(JSON.stringify([1, 'two'], null, 2));
@@ -712,9 +706,6 @@ describe('JsonTree', () => {
     });
   });
   describe('addressable paths', () => {
-    const { convertToTreeData } = require('./lib/utils');
-    const { setValueAtPath } = require('./lib/path');
-
     const findByPath = (node: any, path: string): any => {
       if (node.nodeData?.path === path) {
         return node;
@@ -736,13 +727,13 @@ describe('JsonTree', () => {
     it('addresses object keys and array indices, indices as numbers', () => {
       const tree = convertToTreeData({ address: { city: 'X' }, courses: ['a'] }, 'root', 'root');
 
-      expect(tree.nodeData.pathSegments).toEqual([]);
-      expect(findByPath(tree, 'root.address.city').nodeData.pathSegments).toEqual([
+      expect(tree.nodeData?.pathSegments).toEqual([]);
+      expect(findByPath(tree, 'root.address.city').nodeData?.pathSegments).toEqual([
         'address',
         'city',
       ]);
       // a numeric segment marks an array index, a string marks an object key
-      expect(findByPath(tree, 'root.courses.0').nodeData.pathSegments).toEqual(['courses', 0]);
+      expect(findByPath(tree, 'root.courses.0').nodeData?.pathSegments).toEqual(['courses', 0]);
     });
 
     it('separates a dotted key from a nested object that share a path string', () => {
@@ -766,7 +757,7 @@ describe('JsonTree', () => {
 
       // a Map key can be any value, a Set has no keys: neither can be written back
       expect(unaddressable.length).toBe(2);
-      expect(findByPath(tree, 'root.m').nodeData.pathSegments).toEqual(['m']);
+      expect(findByPath(tree, 'root.m').nodeData?.pathSegments).toEqual(['m']);
     });
 
     it('leaves function properties unaddressable when expanded as an object', () => {
@@ -776,7 +767,7 @@ describe('JsonTree', () => {
 
       const meta = collect(tree).find((n: any) => n.nodeData?.key === 'meta');
       // the properties belong to a synthetic object that is not in the data
-      expect(meta.nodeData.pathSegments).toBeUndefined();
+      expect(meta.nodeData?.pathSegments).toBeUndefined();
     });
 
     it('round-trips: a node address written back lands on that node', () => {
@@ -1019,6 +1010,79 @@ describe('JsonTree', () => {
       expect(html).not.toContain('editable-outline');
       expect(html).not.toContain('data-editable');
       expect(html).not.toContain('data-edit-key');
+    });
+    it('rejects an empty numeric field instead of committing zero', async () => {
+      // NumberInput reports an empty field as '', and Number('') is 0 — committing
+      // that writes a zero the user never typed while trying to clear the field
+      const user = userEvent.setup();
+      const { container, onChange } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.age'));
+      await user.clear(input(container));
+      await user.keyboard('{Enter}');
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(container.textContent).toContain('Required');
+      expect(container.querySelector('input')).not.toBeNull();
+    });
+
+    it('never offers to edit a property of a class instance', () => {
+      // it renders as an object, but setValueAtPath refuses a non-plain prototype:
+      // offering the edit would throw at commit time
+      class Profile {
+        constructor(public city = 'Anytown') {}
+      }
+      const { container } = setup(
+        { editable: true },
+        { profile: new Profile(), plain: { city: 'X' } }
+      );
+
+      expect(cell(container, 'root.profile.city').getAttribute('data-editable')).toBeNull();
+      // a plain object next to it must stay editable — no over-correction
+      expect(cell(container, 'root.plain.city').getAttribute('data-editable')).toBe('true');
+    });
+
+    it('returns focus to the row when an edit is committed', async () => {
+      const user = userEvent.setup();
+      const { container } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.keyboard('{Enter}');
+
+      // the editor unmounts with the input inside it; without this the keyboard
+      // user lands on <body> and arrow navigation stops working
+      expect(document.activeElement?.getAttribute('data-value')).toBe('root.name');
+    });
+
+    it('returns focus to the row when an edit is cancelled', async () => {
+      const user = userEvent.setup();
+      const { container } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+      await user.keyboard('{Escape}');
+
+      expect(document.activeElement?.getAttribute('data-value')).toBe('root.name');
+    });
+    it('keeps the Tree guard when editorProps carries its own handlers', async () => {
+      // spread last, a consumer onKeyDown replaced the guard and Mantine's Tree
+      // reclaimed Space and the arrow keys — the field stopped accepting spaces
+      const user = userEvent.setup();
+      const consumerKeyDown = jest.fn();
+      const { container, onChange } = setup({
+        editable: true,
+        editorProps: { onKeyDown: consumerKeyDown },
+      });
+
+      await user.click(cell(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'a b c');
+
+      expect(input(container).value).toBe('a b c');
+      // the consumer's handler still runs — it is composed, not discarded
+      expect(consumerKeyDown).toHaveBeenCalled();
+
+      await user.keyboard('{Enter}');
+      expect(onChange.mock.calls[0][0].name).toBe('a b c');
     });
   });
 });
