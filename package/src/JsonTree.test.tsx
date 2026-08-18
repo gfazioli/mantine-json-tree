@@ -3,11 +3,41 @@ import { Loader } from '@mantine/core';
 import { fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { JsonTree } from './JsonTree';
+import { JsonTree, type JsonTreeNodePayload } from './JsonTree';
 import { setValueAtPath } from './lib/path';
 import { convertToTreeData, filterTreeBySearch, searchTree, stringifyValue } from './lib/utils';
 
+/** Set by any test that stubs the clipboard; run in a global afterEach. */
+let restoreClipboardAfter: (() => void) | null = null;
+
+/**
+ * Replace navigator.clipboard for one test and hand back a restore function.
+ * Overwriting it without restoring leaks the spy into later tests.
+ */
+function stubClipboard() {
+  const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  const writeText = jest.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+    writable: true,
+  });
+  const restore = () => {
+    if (original) {
+      Object.defineProperty(navigator, 'clipboard', original);
+    } else {
+      delete (navigator as { clipboard?: unknown }).clipboard;
+    }
+  };
+  return { writeText, restore };
+}
+
 describe('JsonTree', () => {
+  afterEach(() => {
+    restoreClipboardAfter?.();
+    restoreClipboardAfter = null;
+  });
+
   it('renders without crashing', () => {
     const { container } = render(<JsonTree data={[]} />);
     expect(container).toBeTruthy();
@@ -509,12 +539,8 @@ describe('JsonTree', () => {
   });
   describe('keyboard copy targeting', () => {
     const mockClipboard = () => {
-      const writeText = jest.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
+      const { writeText, restore } = stubClipboard();
+      restoreClipboardAfter = restore;
       return writeText;
     };
 
@@ -684,12 +710,8 @@ describe('JsonTree', () => {
     });
 
     it('copies a node holding a cycle instead of doing nothing', async () => {
-      const writeText = jest.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
+      const { writeText, restore } = stubClipboard();
+      restoreClipboardAfter = restore;
 
       const data: any = { id: 'root' };
       data.self = data;
@@ -1088,7 +1110,7 @@ describe('JsonTree', () => {
       // the toggle skips the editor, but it is still a commit — a consumer
       // `validate` that rejects the new state must be able to stop it
       const user = userEvent.setup();
-      const validate = jest.fn((_payload: any) => 'not allowed');
+      const validate = jest.fn((_payload: JsonTreeNodePayload) => 'not allowed');
       const { container, onChange } = setup({ editable: true, validate });
 
       await user.click(cell(container, 'root.isAdmin'));
@@ -1104,12 +1126,8 @@ describe('JsonTree', () => {
       // per-node copy button unreachable from the keyboard
       const user = userEvent.setup();
       // after setup(): userEvent installs a clipboard stub of its own
-      const writeText = jest.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
+      const { writeText, restore } = stubClipboard();
+      restoreClipboardAfter = restore;
       const { container } = setup({ editable: true, withCopyToClipboard: true });
 
       const row = container.querySelector<HTMLElement>(
@@ -1121,6 +1139,30 @@ describe('JsonTree', () => {
       expect(container.querySelector('[class*="valueEditor"]')).toBeNull();
       await waitFor(() => expect(writeText).toHaveBeenCalled());
       expect(writeText.mock.calls[0][0]).toBe('"John"');
+    });
+    it('names the editor field for assistive technology', async () => {
+      // an axe run on the open editor reported `label` and `label-title-only`:
+      // the field was announced blank, with no clue which key it belonged to
+      const user = userEvent.setup();
+      const { container } = setup({ editable: true });
+
+      await user.click(cell(container, 'root.name'));
+
+      expect(input(container).getAttribute('aria-label')).toBe('Edit name');
+      // and it stays overridable
+      expect(input(container).getAttribute('aria-invalid')).toBeNull();
+    });
+
+    it('lets a consumer override the editor field name', async () => {
+      const user = userEvent.setup();
+      const { container } = setup({
+        editable: true,
+        editorProps: { 'aria-label': 'Full name' },
+      });
+
+      await user.click(cell(container, 'root.name'));
+
+      expect(input(container).getAttribute('aria-label')).toBe('Full name');
     });
   });
 });
