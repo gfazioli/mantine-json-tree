@@ -12,6 +12,7 @@
     "developer-tools",
     "editable",
     "extension",
+    "json",
     "json-editor",
     "json-tree",
     "json-view",
@@ -22,6 +23,7 @@
     "react",
     "react-component",
     "syntax-highlighting",
+    "treeview",
     "typescript"
   ],
   "main": "./dist/cjs/index.cjs",
