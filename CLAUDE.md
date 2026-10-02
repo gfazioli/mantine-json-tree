@@ -20,14 +20,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `yarn storybook` | Start Storybook dev server |
 | `yarn clean` | Remove build artifacts |
 | `yarn release:patch` | Bump patch version and deploy docs |
-| `diny yolo` | AI-assisted commit (stage all, generate message, commit + push) |
+| `diny yolo` | AI-assisted commit (stage all, generate message, commit + push); it needs a TTY, so from Claude Code commit with `git commit` + `git push` |
 
 > **Important**: After changing the public API (props, types, exports), always run `yarn clean && yarn build` before `yarn test`, because `yarn docgen` needs the fresh build output.
 
 ## Architecture
 
 ### Workspace Layout
-Yarn workspaces monorepo with two workspaces: `package/` (npm package) and `docs/` (Next.js 15 documentation site).
+Yarn workspaces monorepo with two workspaces: `package/` (npm package) and `docs/` (Next.js 16 documentation site).
 
 ### Package Source (`package/src/`)
 ```
@@ -99,8 +99,7 @@ When `stickyHeader` is true, the header gets `position: sticky` via `[data-stick
 Jest with `jsdom` environment, `esbuild-jest` transform, CSS mocked via `identity-obj-proxy`. Component tests use `@mantine-tests/core` render helper. Test file: `package/src/JsonTree.test.tsx`.
 
 ## Ecosystem
-This repo is part of the Mantine Extensions ecosystem, derived from the `mantine-base-component` template. See the workspace `CLAUDE.md` (in the parent directory) for:
-- Development checklist (code -> test -> build -> docs -> release)
-- Cross-cutting patterns (compound components, responsive CSS, GitHub sync)
-- Update packages workflow
-- Release process
+This repo is part of the Mantine Extensions ecosystem, derived from the `mantine-base-component` template. See the workspace (the parent directory) for:
+- Development checklist and cross-cutting patterns (compound components, responsive CSS, GitHub sync): the workspace's `.claude/rules/component-development.md`, which loads with this repo's files
+- Update packages workflow: the workspace's `fleet-maintenance` skill
+- Release process: the workspace's `/release` command
