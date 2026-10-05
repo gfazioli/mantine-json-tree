@@ -25,12 +25,17 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     ellipsis: 'Element that renders ellipsis for collapsed nodes',
     lineNumber: 'Element that renders line numbers',
     valueEditor: 'Wrapper around the inline editor shown while a value is being edited',
+    typeBadge: 'Type badge next to every value, shown with showValueTypes',
+    showMore: 'Toggle that reveals a string cut by collapseStringsAfterLength',
   },
 
   vars: {
     root: {
       '--json-tree-font-family': 'Font family for the JSON tree',
       '--json-tree-font-size': 'Font size for the JSON tree',
+      '--json-tree-highlight-added-color': 'Background of a row highlightNode reports as added',
+      '--json-tree-highlight-removed-color': 'Background of a row highlightNode reports as removed',
+      '--json-tree-highlight-changed-color': 'Background of a row highlightNode reports as changed',
     },
     header: {
       '--json-tree-header-background-color': 'Background color for the header',
@@ -75,6 +80,8 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
       '--json-tree-color-ellipsis': 'Color for the ellipsis indicator on collapsed nodes',
     },
     valueEditor: {},
+    typeBadge: {},
+    showMore: {},
     lineNumber: {
       '--json-tree-color-line-number': 'Color for line numbers',
     },

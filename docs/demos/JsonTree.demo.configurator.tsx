@@ -36,6 +36,8 @@ export const configurator: MantineDemo = {
     { type: 'boolean', prop: 'showItemsCount', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'showLineNumbers', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'showPathOnHover', initialValue: true, libraryValue: false },
+    { type: 'boolean', prop: 'showValueTypes', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'sortKeys', initialValue: false, libraryValue: false },
     {
       type: 'select',
       prop: 'displayFunctions',

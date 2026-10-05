@@ -5,7 +5,14 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { JsonTree, type JsonTreeNodePayload } from './JsonTree';
 import { setValueAtPath } from './lib/path';
-import { convertToTreeData, filterTreeBySearch, searchTree, stringifyValue } from './lib/utils';
+import {
+  convertToTreeData,
+  filterTreeBySearch,
+  getArrayGroupSize,
+  getTypeLabel,
+  searchTree,
+  stringifyValue,
+} from './lib/utils';
 
 /** Set by any test that stubs the clipboard; run in a global afterEach. */
 let restoreClipboardAfter: (() => void) | null = null;
@@ -1163,6 +1170,261 @@ describe('JsonTree', () => {
       await user.click(cell(container, 'root.name'));
 
       expect(input(container).getAttribute('aria-label')).toBe('Full name');
+    });
+  });
+});
+
+// ─── Features inspired by Mantine's JsonViewer ──────────────────────────────
+
+describe('JsonTree display options', () => {
+  const collect = (node: any, out: any[] = []): any[] => {
+    out.push(node);
+    (node.children ?? []).forEach((c: any) => collect(c, out));
+    return out;
+  };
+  const keysOf = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('[data-key]')).map((el) => el.getAttribute('data-key'));
+  const rowOf = (container: HTMLElement, key: string) =>
+    container
+      .querySelector(`[data-key="${key}"]`)!
+      .closest('[data-json-tree-highlight], .mantine-Group-root');
+
+  describe('sortKeys', () => {
+    const data = { zebra: 1, apple: 2, mango: 3 };
+
+    it('keeps the insertion order by default', () => {
+      const { container } = render(<JsonTree data={data} defaultExpanded />);
+      expect(keysOf(container)).toEqual(['zebra', 'apple', 'mango']);
+    });
+
+    it('sorts object keys alphabetically', () => {
+      const { container } = render(<JsonTree data={data} defaultExpanded sortKeys />);
+      expect(keysOf(container)).toEqual(['apple', 'mango', 'zebra']);
+    });
+
+    it('accepts a comparator', () => {
+      const { container } = render(
+        <JsonTree data={data} defaultExpanded sortKeys={(a, b) => b.localeCompare(a)} />
+      );
+      expect(keysOf(container)).toEqual(['zebra', 'mango', 'apple']);
+    });
+
+    it('never reorders an array, and keeps every path', () => {
+      const tree = convertToTreeData(
+        { b: ['z', 'a'], a: 1 },
+        'root',
+        'root',
+        0,
+        'as-string',
+        [],
+        [],
+        {
+          sortKeys: true,
+        }
+      );
+      expect(tree.children!.map((n: any) => n.nodeData.key)).toEqual(['a', 'b']);
+      const list = tree.children!.find((n: any) => n.nodeData.key === 'b') as any;
+      expect(list.children.map((n: any) => n.nodeData.value)).toEqual(['z', 'a']);
+      expect(list.children[1].nodeData.pathSegments).toEqual(['b', 1]);
+    });
+  });
+
+  describe('groupArraysAfterLength', () => {
+    const list = Array.from({ length: 25 }, (_, i) => `item-${i}`);
+    const convert = (value: unknown, groupArraysAfterLength?: number) =>
+      convertToTreeData(value, 'root', 'root', 0, 'as-string', [], [], { groupArraysAfterLength });
+
+    it('computes the group size only past the limit', () => {
+      expect(getArrayGroupSize(25, 10)).toBe(10);
+      expect(getArrayGroupSize(10, 10)).toBe(0);
+      expect(getArrayGroupSize(25, undefined)).toBe(0);
+      expect(getArrayGroupSize(25, 0)).toBe(0);
+      expect(getArrayGroupSize(25, Number.NaN)).toBe(0);
+    });
+
+    it('splits a long array into [start…end] groups', () => {
+      const tree = convert({ list }, 10);
+      const node = tree.children![0] as any;
+      expect(node.children.map((n: any) => n.label)).toEqual(['[0…9]', '[10…19]', '[20…24]']);
+      expect(node.children[2].children).toHaveLength(5);
+      expect(node.nodeData.itemCount).toBe(25);
+    });
+
+    it('keeps the real path and address of every item', () => {
+      const tree = convert({ list }, 10);
+      const item = collect(tree).find((n: any) => n.nodeData?.value === 'item-12');
+      expect(item.nodeData.path).toBe('root.list.12');
+      expect(item.nodeData.pathSegments).toEqual(['list', 12]);
+      expect(item.nodeData.depth).toBe(3);
+    });
+
+    it('gives a group no address, so it can never be edited or written to', () => {
+      const tree = convert({ list }, 10);
+      const group = (tree.children![0] as any).children[1];
+      expect(group.nodeData.chunk).toEqual({ start: 10, end: 19 });
+      expect(group.nodeData.pathSegments).toBeUndefined();
+      expect(group.nodeData.value).toEqual(list.slice(10, 20));
+    });
+
+    it('leaves short arrays and objects alone', () => {
+      const tree = convert(
+        { short: ['a', 'b'], obj: Object.fromEntries(list.map((v, i) => [i, v])) },
+        10
+      );
+      expect(collect(tree).some((n: any) => n.nodeData?.chunk)).toBe(false);
+    });
+
+    it('does not match a group label in a search', () => {
+      const tree = convert({ list }, 10);
+      const result = searchTree([tree], '1');
+      const matchedGroupLabels = Array.from(result.directMatches).filter((p) => p.includes('…'));
+      expect(matchedGroupLabels).toEqual([]);
+      expect(result.directMatches.has('root.list.12')).toBe(true);
+    });
+
+    it('renders the groups, collapsed', () => {
+      const { container, getByText } = render(
+        <JsonTree data={{ list }} defaultExpanded maxDepth={2} groupArraysAfterLength={10} />
+      );
+      expect(getByText('[10…19]')).toBeInTheDocument();
+      expect(container.textContent).not.toContain('item-12');
+    });
+  });
+
+  describe('collapseStringsAfterLength', () => {
+    const long = 'abcdefghijklmnopqrstuvwxyz';
+
+    it('cuts a long string and reveals it on demand', async () => {
+      const { container, getByRole } = render(
+        <JsonTree data={{ text: long }} defaultExpanded collapseStringsAfterLength={5} />
+      );
+      expect(container.textContent).toContain('"abcde…"');
+      expect(container.textContent).not.toContain(long);
+
+      const toggle = getByRole('button', { name: 'show more' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(toggle);
+      expect(container.textContent).toContain(`"${long}"`);
+      expect(getByRole('button', { name: 'show less' })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('does not toggle the row when the toggle is clicked', async () => {
+      const onNodeClick = jest.fn();
+      const { getByRole } = render(
+        <JsonTree
+          data={{ text: long }}
+          defaultExpanded
+          collapseStringsAfterLength={5}
+          onNodeClick={onNodeClick}
+        />
+      );
+      await userEvent.click(getByRole('button', { name: 'show more' }));
+      expect(onNodeClick).not.toHaveBeenCalled();
+    });
+
+    it('leaves short strings and other types alone', () => {
+      const { container, queryByRole } = render(
+        <JsonTree
+          data={{ text: 'short', n: 12345678901 }}
+          defaultExpanded
+          collapseStringsAfterLength={5}
+        />
+      );
+      expect(container.textContent).toContain('"short"');
+      expect(container.textContent).toContain('12345678901');
+      expect(queryByRole('button', { name: 'show more' })).toBeNull();
+    });
+
+    it('never splits an emoji in two', () => {
+      const { container } = render(
+        <JsonTree data={{ text: 'ab😀cdefgh' }} defaultExpanded collapseStringsAfterLength={3} />
+      );
+      // cutting at 3 would keep half of the surrogate pair
+      expect(container.textContent).toContain('"ab…"');
+    });
+  });
+
+  describe('highlightNode', () => {
+    const data = { name: 'Alice', age: 31, tags: ['a'] };
+
+    it('marks the rows it reports, with the node payload', () => {
+      const highlightNode = jest.fn(({ key }: { key?: string }) =>
+        key === 'name' ? 'changed' : key === 'tags' ? 'added' : null
+      );
+      const { container } = render(
+        <JsonTree data={data} defaultExpanded highlightNode={highlightNode} />
+      );
+
+      expect(rowOf(container, 'name')).toHaveAttribute('data-json-tree-highlight', 'changed');
+      expect(container.querySelector('[data-json-tree-highlight="added"]')).toHaveTextContent(
+        'tags'
+      );
+      expect(rowOf(container, 'age')).not.toHaveAttribute('data-json-tree-highlight');
+
+      expect(highlightNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: 'root.name',
+          pathSegments: ['name'],
+          type: 'string',
+          value: 'Alice',
+        })
+      );
+    });
+
+    it('is never asked about an array group', () => {
+      const highlightNode = jest.fn(() => null);
+      render(
+        <JsonTree
+          data={{ list: Array.from({ length: 5 }, (_, i) => i) }}
+          defaultExpanded
+          maxDepth={-1}
+          groupArraysAfterLength={2}
+          highlightNode={highlightNode}
+        />
+      );
+      const keys = highlightNode.mock.calls.map(([payload]: any) => payload.key);
+      expect(keys.some((k: string | undefined) => k?.includes('…'))).toBe(false);
+      expect(keys).toContain('3');
+    });
+  });
+
+  describe('showValueTypes', () => {
+    it('labels every value with its type', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ s: 'x', i: 1, f: 1.5, b: true, n: null, o: { a: 1 }, l: [1] }}
+          defaultExpanded
+          maxDepth={1}
+          showValueTypes
+        />
+      );
+      const badges = Array.from(container.querySelectorAll('.typeBadge')).map(
+        (el) => el.textContent
+      );
+      expect(badges).toEqual([
+        'object',
+        'string',
+        'int',
+        'float',
+        'bool',
+        'null',
+        'object',
+        'array',
+      ]);
+    });
+
+    it('shows no badge by default', () => {
+      const { container } = render(<JsonTree data={{ s: 'x' }} defaultExpanded />);
+      expect(container.querySelector('.typeBadge')).toBeNull();
+    });
+
+    it('reads numbers the way a JSON schema types them', () => {
+      expect(getTypeLabel('number', 3)).toBe('int');
+      expect(getTypeLabel('number', 3.5)).toBe('float');
+      expect(getTypeLabel('nan', Number.NaN)).toBe('number');
+      expect(getTypeLabel('boolean', false)).toBe('bool');
+      expect(getTypeLabel('react-element', null)).toBe('element');
+      expect(getTypeLabel('date', new Date())).toBe('date');
     });
   });
 });

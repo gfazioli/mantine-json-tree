@@ -32,6 +32,9 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - **In-place editing** of strings, numbers and booleans (`editable`, `onChange`) — immutable updates that
   leave every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element in the tree untouched
 - **Search** with text highlight, filtered tree view, and auto-expand matching branches
+- **Diff highlighting**: mark nodes as added, removed or changed with `highlightNode`
+- **Large data**: long arrays split into collapsible `[start…end]` groups (`groupArraysAfterLength`), long strings cut with a "show more" toggle (`collapseStringsAfterLength`)
+- **Type badges** next to every value (`showValueTypes`) and **sorted keys** (`sortKeys`)
 - **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
 - **Paper wrapper** with `withBorder` for bordered container look
 - **Custom root name** via `rootName` prop
@@ -50,7 +53,7 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - Sticky header support with configurable offset
 - Function display modes: as-string, hide, or as-object introspection
 - Responsive font size via Mantine breakpoint objects (CSS-native, no re-renders)
-- Full Mantine Styles API support with 21 style selectors and 25+ CSS variables
+- Full Mantine Styles API support with 24 style selectors and 25+ CSS variables
 - Custom icons for expand/collapse and copy controls
 - Item count badges for objects and arrays
 - `onExpand`, `onCollapse`, `onNodeClick`, `onCopy`, and `onCopyAll` callbacks

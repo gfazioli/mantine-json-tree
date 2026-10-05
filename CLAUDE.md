@@ -70,6 +70,13 @@ When `withSearch` is enabled, a search bar filters the tree to show only matchin
 ### Expansion control
 `defaultExpanded` + `maxDepth` props control initial state. `maxDepth: -1` expands all via `getTreeExpandedState(treeData, '*')`. Otherwise, a depth-limited traversal collects node values to expand. The `useTree` hook manages expand/collapse state.
 
+### Display options (sortKeys, groupArraysAfterLength, collapseStringsAfterLength, highlightNode, showValueTypes)
+Inspired by Mantine 9.7's `JsonViewer`:
+- `sortKeys` and `groupArraysAfterLength` change the **shape** of the tree, so they are applied in `convertToTreeData()` through its last argument (`ConvertToTreeDataOptions`), and `treeData` is memoized on them. Sorting is display-only: every entry keeps its own key, path and `pathSegments`.
+- A group is a synthetic node `[start…end]` carrying `nodeData.chunk`, `pathSegments: undefined` (never editable or written to) and the slice as its value; its items keep their real `path` / `pathSegments`, at `depth + 2`. `searchTree()` skips the key of a chunk, or searching "1" would match every group label. Hidden functions are filtered **after** grouping, so a group always covers the indices its label shows.
+- `collapseStringsAfterLength` is rendered by `CollapsibleString` (a component, since `renderJSONNode` is a plain function and the open state must live with the row). It never cuts while a search is active, and never splits a surrogate pair.
+- `highlightNode(payload)` sets `data-json-tree-highlight` on the row; the tints are scheme-dependent CSS defaults (`var(--json-tree-highlight-*-color, …)` with `where-dark`), because a `varsResolver` value is an inline style that one color scheme cannot override. The vars stay in the resolver as `undefined` so `vars` can still set them.
+
 ### Responsive CSS (size prop)
 The `size` prop supports responsive breakpoint objects via CSS-native approach (`StyleProp<T>`). `JsonTreeMediaVariables` component uses `InlineStyles` + CSS media queries to set `--json-tree-font-size` per breakpoint — no JavaScript re-renders. Pattern follows Mantine core's `SimpleGridMediaVariables` and `mantine-select-stepper`'s `SelectStepperMediaVariables`. Uses `useRandomClassName` for scoped selectors.
 
@@ -84,7 +91,7 @@ The `varsResolver` maps props to CSS variables across multiple style targets:
 - **indentGuide**: 5 rotating color variables (`--json-tree-indent-guide-color-0` through `4`)
 
 ### Styles API selectors
-`root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
+`root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`, `valueEditor`, `typeBadge`, `showMore`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
 
 ### Indent guides
 When `showIndentGuides` is enabled, absolutely-positioned `<div>` elements are rendered for each depth level with cycling colors (5-color palette via `data-color-index`). Guide position: `left = depth * 32 + 8px` (matching Mantine Tree's `levelOffset={32}`).

@@ -21,6 +21,7 @@ import {
   Text,
   Tooltip,
   Tree,
+  UnstyledButton,
   useProps,
   useRandomClassName,
   useStyles,
@@ -49,6 +50,7 @@ import {
   findNodeByPath,
   formatValue,
   getItemCount,
+  getTypeLabel,
   isExpandable,
   searchTree,
   stringifyValue,
@@ -79,10 +81,17 @@ export type JsonTreeStylesNames =
   | 'indentGuide'
   | 'copyButton'
   | 'lineNumber'
-  | 'valueEditor';
+  | 'valueEditor'
+  | 'typeBadge'
+  | 'showMore';
 
 export type JsonTreeCssVariables = {
-  root: '--json-tree-font-family' | '--json-tree-font-size';
+  root:
+    | '--json-tree-font-family'
+    | '--json-tree-font-size'
+    | '--json-tree-highlight-added-color'
+    | '--json-tree-highlight-removed-color'
+    | '--json-tree-highlight-changed-color';
   header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
   key: '--json-tree-color-key';
   value:
@@ -125,6 +134,8 @@ export type JsonTreeCssVariables = {
   searchInput: never;
   searchHighlight: '--json-tree-search-highlight-color';
   valueEditor: never;
+  typeBadge: never;
+  showMore: never;
 };
 
 export interface JsonTreeBaseProps {
@@ -211,6 +222,30 @@ export interface JsonTreeBaseProps {
 
   /** How to display functions in the JSON data @default 'as-string' */
   displayFunctions?: JsonTreeFunctionDisplay;
+
+  /**
+   * Sort the keys of objects: `true` for alphabetical order, or a comparator.
+   * Display order only: paths, search and edits are unchanged. Memoize a
+   * comparator, a new function on every render rebuilds the tree.
+   * @default false
+   */
+  sortKeys?: boolean | ((a: string, b: string) => number);
+
+  /**
+   * Split arrays longer than this into collapsible `[start…end]` groups of this
+   * many items, so a large array does not render all of its items at once. Each
+   * group is one more level of the tree, which `maxDepth` counts too.
+   */
+  groupArraysAfterLength?: number;
+
+  /** Truncate string values longer than this many characters, with a toggle to show the full text */
+  collapseStringsAfterLength?: number;
+
+  /** Return how a node changed to highlight it diff-style, or `null` to leave it as is */
+  highlightNode?: (payload: JsonTreeHighlightPayload) => JsonTreeHighlight | null | undefined;
+
+  /** Whether to show a type badge (`string`, `int`, `float`, `bool`, `object`, …) next to every value @default false */
+  showValueTypes?: boolean;
 
   /** Whether to wrap the component in a Paper with a border @default false */
   withBorder?: boolean;
@@ -332,6 +367,23 @@ export interface JsonTreeNodePayload {
   value: unknown;
 }
 
+/** How a node changed, as `highlightNode` reports it */
+export type JsonTreeHighlight = 'added' | 'removed' | 'changed';
+
+/** The node `highlightNode` is asked about */
+export interface JsonTreeHighlightPayload {
+  /** Display path, e.g. `root.address.city`. Not unique — see `pathSegments` */
+  path: string;
+  /** The node's address, absent under a `Map`, a `Set` or a function shown as an object */
+  pathSegments?: JsonTreePathSegments;
+  /** The key this value is stored under, absent on the root */
+  key?: string;
+  /** The node's value type */
+  type: ValueType;
+  /** The node's value */
+  value: unknown;
+}
+
 /** Describes a committed edit */
 export interface JsonTreeChange extends JsonTreeNodePayload {
   /** The value the node held before the edit */
@@ -374,7 +426,52 @@ export const defaultProps: Partial<JsonTreeProps> = {
   searchDebounce: 300,
   editable: false,
   editableTypes: ['string', 'number', 'boolean'],
+  sortKeys: false,
+  showValueTypes: false,
 };
+
+/** Cut a string at `limit` characters without splitting a surrogate pair (an emoji, say) in two */
+function truncateString(text: string, limit: number) {
+  const code = text.charCodeAt(limit - 1);
+  const splitsPair = code >= 0xd800 && code <= 0xdbff;
+  return text.slice(0, splitsPair ? limit - 1 : limit);
+}
+
+/**
+ * A string value cut at `limit` characters, with a toggle to read the rest. It is
+ * its own component because `renderJSONNode` is a plain function and the open
+ * state has to live with the row.
+ */
+function CollapsibleString({
+  value,
+  limit,
+  getStyles,
+  children,
+}: {
+  value: string;
+  limit: number;
+  getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
+  children: (display: string) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {children(open ? `"${value}"` : `"${truncateString(value, limit)}…"`)}
+      <UnstyledButton
+        {...getStyles('showMore')}
+        aria-expanded={open}
+        onClick={(event: React.MouseEvent) => {
+          // the row's own click toggles the node or calls onNodeClick
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+      >
+        {open ? 'show less' : 'show more'}
+      </UnstyledButton>
+    </>
+  );
+}
 
 /** Elements that own the Enter key themselves — activating them must win over editing. */
 const KEYBOARD_ACTIVATED_SELECTOR =
@@ -502,6 +599,7 @@ function renderJSONNode(
     itemCount,
     depth = 0,
     pathSegments,
+    chunk,
   } = jsonNode.nodeData || {
     type: 'null' as ValueType,
     value: null,
@@ -517,7 +615,28 @@ function renderJSONNode(
     showLineNumbers,
     showPathOnHover,
     tooltipProps,
+    collapseStringsAfterLength,
+    showValueTypes,
+    highlightNode,
   } = props;
+
+  // A `[start…end]` group is not a node of the data: nothing to highlight or to type
+  const highlight =
+    !chunk && highlightNode
+      ? (highlightNode({ path, pathSegments, key, type, value }) ?? undefined)
+      : undefined;
+
+  const typeBadge =
+    showValueTypes && !chunk ? (
+      <Text component="span" {...getStyles('typeBadge')} data-type={type}>
+        {getTypeLabel(type, value)}
+      </Text>
+    ) : null;
+
+  const collapseLimit =
+    collapseStringsAfterLength !== undefined && Number.isFinite(collapseStringsAfterLength)
+      ? Math.max(1, Math.floor(collapseStringsAfterLength))
+      : 0;
 
   const handleCopy = async (e: React.MouseEvent): Promise<boolean> => {
     e.stopPropagation();
@@ -600,6 +719,7 @@ function renderJSONNode(
         wrap="nowrap"
         {...elementProps}
         onClick={handleClick}
+        data-json-tree-highlight={highlight}
         style={{
           cursor: onNodeClick ? 'pointer' : 'default',
           position: 'relative',
@@ -644,7 +764,7 @@ function renderJSONNode(
             );
           }
 
-          return (
+          const renderValue = (display: string) => (
             <Code
               {...getStyles('value')}
               data-type={type}
@@ -675,12 +795,32 @@ function renderJSONNode(
                   : undefined
               }
             >
-              {ctx.searchQuery
-                ? highlightText(formattedValue, ctx.searchQuery, getStyles)
-                : formattedValue}
+              {ctx.searchQuery ? highlightText(display, ctx.searchQuery, getStyles) : display}
             </Code>
           );
+
+          // While searching the whole string shows, so a match past the cut stays visible
+          if (
+            type === 'string' &&
+            collapseLimit &&
+            !ctx.searchQuery &&
+            (value as string).length > collapseLimit
+          ) {
+            return (
+              <CollapsibleString
+                value={value as string}
+                limit={collapseLimit}
+                getStyles={getStyles}
+              >
+                {renderValue}
+              </CollapsibleString>
+            );
+          }
+
+          return renderValue(formattedValue);
         })()}
+
+        {typeBadge}
 
         {withCopyToClipboard && (
           <CopyNodeButton icon={copyToClipboardIcon} getStyles={getStyles} onCopy={handleCopy} />
@@ -728,6 +868,7 @@ function renderJSONNode(
       wrap="nowrap"
       {...elementProps}
       onClick={handleClick}
+      data-json-tree-highlight={highlight}
       data-expanded={expanded}
       data-has-children={hasChildren}
       data-type={type}
@@ -782,6 +923,8 @@ function renderJSONNode(
         </>
       )}
 
+      {typeBadge}
+
       {withCopyToClipboard && (
         <ActionIcon
           size="xs"
@@ -803,6 +946,11 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       root: {
         '--json-tree-font-family': 'var(--mantine-font-family-monospace)',
         '--json-tree-font-size': undefined,
+        // The defaults depend on the color scheme, so they live in the stylesheet;
+        // these only carry an override passed through `vars`.
+        '--json-tree-highlight-added-color': undefined,
+        '--json-tree-highlight-removed-color': undefined,
+        '--json-tree-highlight-changed-color': undefined,
       },
       header: {
         '--json-tree-header-background-color': 'inherit',
@@ -857,6 +1005,8 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
         '--json-tree-search-highlight-color': 'var(--mantine-color-yellow-3)',
       },
       valueEditor: {},
+      typeBadge: {},
+      showMore: {},
     };
   }
 );
@@ -913,6 +1063,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     isEditable,
     validate,
     editorProps,
+    sortKeys,
+    groupArraysAfterLength,
+    collapseStringsAfterLength: _collapseStringsAfterLength,
+    highlightNode: _highlightNode,
+    showValueTypes: _showValueTypes,
 
     classNames,
     style,
@@ -941,8 +1096,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
-    () => [convertToTreeData(data, rootName ?? 'root', rootName ?? 'root', 0, displayFunctions)],
-    [data, rootName, displayFunctions]
+    () => [
+      convertToTreeData(data, rootName ?? 'root', rootName ?? 'root', 0, displayFunctions, [], [], {
+        sortKeys,
+        groupArraysAfterLength,
+      }),
+    ],
+    [data, rootName, displayFunctions, sortKeys, groupArraysAfterLength]
   );
 
   // Calculate initial expanded state — use controlled prop if provided

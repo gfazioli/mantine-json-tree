@@ -6,6 +6,8 @@ export type {
   JsonTreeEditableType,
   JsonTreeFactory,
   JsonTreeFunctionDisplay,
+  JsonTreeHighlight,
+  JsonTreeHighlightPayload,
   JsonTreeNodePayload,
   JsonTreeProps,
   JsonTreeStylesNames,
