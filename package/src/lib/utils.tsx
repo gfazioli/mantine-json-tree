@@ -25,7 +25,52 @@ export interface JSONTreeNodeData extends TreeNodeData {
      * exist in the data).
      */
     pathSegments?: JsonTreePathSegments;
+    /**
+     * Set on the synthetic `[start…end]` node that `groupArraysAfterLength`
+     * inserts between a long array and its items. It is not a value of the
+     * data: it has no address, and its items keep their own paths.
+     */
+    chunk?: { start: number; end: number };
   };
+}
+
+/** Display options that change the shape of the tree, not its values. */
+export interface ConvertToTreeDataOptions {
+  /** Sort the keys of objects: `true` for alphabetical order, or a comparator */
+  sortKeys?: boolean | ((a: string, b: string) => number);
+  /** Split an array longer than this into `[start…end]` groups of this many items */
+  groupArraysAfterLength?: number;
+}
+
+/**
+ * The group size for an array of `length` items, or `0` when it is not grouped.
+ */
+export function getArrayGroupSize(length: number, groupArraysAfterLength?: number): number {
+  if (groupArraysAfterLength === undefined || !Number.isFinite(groupArraysAfterLength)) {
+    return 0;
+  }
+  const size = Math.floor(groupArraysAfterLength);
+  return size >= 1 && length > size ? size : 0;
+}
+
+/**
+ * The text of a JSON type badge: numbers read as `int` or `float`, like a JSON
+ * schema would type them.
+ */
+export function getTypeLabel(type: ValueType, value: unknown): string {
+  switch (type) {
+    case 'number':
+      return Number.isInteger(value) ? 'int' : 'float';
+    case 'nan':
+    case 'infinity':
+      return 'number';
+    case 'boolean':
+      return 'bool';
+    case 'react-element':
+      return 'element';
+    default:
+      return type;
+  }
 }
 
 /**
@@ -300,7 +345,8 @@ export function convertToTreeData(
   // `null` marks an unaddressable subtree. It cannot be `undefined`: passing
   // `undefined` to a parameter with a default re-triggers that default, which
   // would silently hand every Map/Set child a valid-looking address.
-  segments: JsonTreePathSegments | null = []
+  segments: JsonTreePathSegments | null = [],
+  options: ConvertToTreeDataOptions = {}
 ): JSONTreeNodeData {
   const type = getValueType(value);
   // `null` is the internal sentinel; the public shape uses `undefined`
@@ -374,7 +420,8 @@ export function convertToTreeData(
       displayFunctions,
       [...ancestors, value],
       // these properties belong to a synthetic object, so none of them is addressable
-      null
+      null,
+      options
     );
   }
 
@@ -412,7 +459,20 @@ export function convertToTreeData(
     entries = Object.entries(value).map(
       ([k, v]) => [k, v, k] as [string, any, string | number | undefined]
     );
+    if (options.sortKeys) {
+      const compare =
+        typeof options.sortKeys === 'function'
+          ? options.sortKeys
+          : (a: string, b: string) => a.localeCompare(b);
+      // Display order only: every entry keeps its own key, so paths and edits are unchanged
+      entries.sort((a, b) => compare(a[0], b[0]));
+    }
   }
+
+  // A long array gets one level of `[start…end]` groups between it and its items
+  const groupSize =
+    type === 'array' ? getArrayGroupSize(entries.length, options.groupArraysAfterLength) : 0;
+  const childDepth = groupSize ? depth + 2 : depth + 1;
 
   const childAncestors = [...ancestors, value];
   // Only a plain object or an array can be written into. A class instance is
@@ -420,22 +480,51 @@ export function convertToTreeData(
   // that setValueAtPath refuses — the two rules have to agree, or an edit
   // throws at commit time instead of never being offered.
   const childrenAddressable = isWritableContainer(value);
-  const children = entries
-    .map(([k, v, segment]) =>
-      convertToTreeData(
-        v,
-        k,
-        `${path}.${k}`,
-        depth + 1,
-        displayFunctions,
-        childAncestors,
-        // an unaddressable step makes the whole subtree below it unaddressable
-        segments === null || segment === undefined || !childrenAddressable
-          ? null
-          : [...segments, segment]
-      )
+  // Hidden functions come back as `null`: they are filtered out only after grouping,
+  // so a group still covers the indices its label announces.
+  const convertedChildren = entries.map(([k, v, segment]) =>
+    convertToTreeData(
+      v,
+      k,
+      `${path}.${k}`,
+      childDepth,
+      displayFunctions,
+      childAncestors,
+      // an unaddressable step makes the whole subtree below it unaddressable
+      segments === null || segment === undefined || !childrenAddressable
+        ? null
+        : [...segments, segment],
+      options
     )
-    .filter((node) => node !== null); // Filter out hidden functions
+  );
+  const isShown = (node: JSONTreeNodeData | null): node is JSONTreeNodeData => node !== null;
+
+  let children: JSONTreeNodeData[];
+  if (groupSize) {
+    children = [];
+    for (let start = 0; start < entries.length; start += groupSize) {
+      const end = Math.min(start + groupSize, entries.length) - 1;
+      const label = `[${start}…${end}]`;
+      const chunkPath = `${path}.${label}`;
+      children.push({
+        value: chunkPath,
+        label,
+        children: convertedChildren.slice(start, end + 1).filter(isShown),
+        nodeData: {
+          type: 'array',
+          value: value.slice(start, end + 1),
+          key: label,
+          path: chunkPath,
+          itemCount: end - start + 1,
+          depth: depth + 1,
+          pathSegments: undefined,
+          chunk: { start, end },
+        },
+      });
+    }
+  } else {
+    children = convertedChildren.filter(isShown);
+  }
 
   return {
     value: nodeValue,
@@ -484,7 +573,8 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
     const nd = node.nodeData;
     let matches = false;
 
-    if (nd) {
+    // A `[start…end]` group label is not a key of the data: searching "1" must not match it
+    if (nd && !nd.chunk) {
       if (nd.key !== undefined && String(nd.key).toLowerCase().includes(lowerQuery)) {
         matches = true;
       }

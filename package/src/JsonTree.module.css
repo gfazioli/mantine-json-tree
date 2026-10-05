@@ -275,3 +275,56 @@
     background-color: var(--json-tree-search-highlight-color, rgba(251, 191, 36, 0.3));
   }
 }
+
+/* A row `highlightNode` reported as changed: a tint and a bar on the leading edge. The tints are
+   the ones Mantine's JsonViewer uses, so a string value stays legible on them in both schemes. */
+.root :where([data-json-tree-highlight]) {
+  border-radius: var(--mantine-radius-sm);
+}
+
+.root :where([data-json-tree-highlight='added']) {
+  background-color: var(--json-tree-highlight-added-color, var(--mantine-color-green-1));
+  box-shadow: inset 3px 0 0 var(--mantine-color-green-filled);
+
+  @mixin where-dark {
+    background-color: var(--json-tree-highlight-added-color, rgba(64, 192, 87, 0.15));
+  }
+}
+
+.root :where([data-json-tree-highlight='removed']) {
+  background-color: var(--json-tree-highlight-removed-color, var(--mantine-color-red-1));
+  box-shadow: inset 3px 0 0 var(--mantine-color-red-filled);
+
+  @mixin where-dark {
+    background-color: var(--json-tree-highlight-removed-color, rgba(250, 82, 82, 0.15));
+  }
+}
+
+.root :where([data-json-tree-highlight='changed']) {
+  background-color: var(--json-tree-highlight-changed-color, var(--mantine-color-yellow-1));
+  box-shadow: inset 3px 0 0 var(--mantine-color-yellow-filled);
+
+  @mixin where-dark {
+    background-color: var(--json-tree-highlight-changed-color, rgba(250, 176, 5, 0.15));
+  }
+}
+
+.typeBadge {
+  font-size: 0.75em;
+  line-height: 1.4;
+  padding: 0 4px;
+  border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-dimmed);
+  background-color: var(--mantine-color-default-hover);
+  user-select: none;
+}
+
+.showMore {
+  font-family: var(--mantine-font-family);
+  font-size: 0.85em;
+  color: var(--mantine-color-anchor);
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

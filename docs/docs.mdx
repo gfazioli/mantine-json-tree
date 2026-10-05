@@ -3,6 +3,11 @@ import * as demos from './demos';
 
 ## What's new
 
+- **Diff highlighting** — mark nodes as added, removed or changed (`highlightNode`)
+- **Large arrays** split into collapsible `[start…end]` groups (`groupArraysAfterLength`)
+- **Long strings** cut with a "show more" toggle (`collapseStringsAfterLength`)
+- **Type badges** next to every value (`showValueTypes`)
+- **Sorted keys**, alphabetical or with your own comparator (`sortKeys`)
 - **Editable values** — click a string, number or boolean to edit it in place (`editable`, `onChange`)
 - **Circular references** are detected and marked instead of crashing the component
 - **Search** with text highlight, auto-expand, and filtered tree view (`withSearch`)
@@ -188,6 +193,28 @@ different branches is shared, not circular, so it keeps expanding normally in bo
 `config` object does below.
 
 <Demo data={demos.circular} />
+
+## Diff Highlighting
+
+`highlightNode` is called for every node and returns how it changed: `'added'`, `'removed'`, `'changed'`, or `null` to leave it as is. It receives the node's `path`, `pathSegments`, `key`, `type` and `value`, so a diff can be computed against any previous version of the data — below, by reading the same `pathSegments` in both versions.
+
+The colors come from the `--json-tree-highlight-added-color`, `--json-tree-highlight-removed-color` and `--json-tree-highlight-changed-color` variables, and each highlighted row carries a `data-json-tree-highlight` attribute for your own styles.
+
+<Demo data={demos.diff} />
+
+## Large Data
+
+Three props keep big payloads readable:
+
+- `groupArraysAfterLength` splits an array longer than the given length into collapsible `[start…end]` groups of that many items, so a large array does not render every item at once. Each group is one more level of the tree (and of `maxDepth`); the items inside keep their own paths, so search, copy and editing work as before.
+- `collapseStringsAfterLength` cuts longer strings and adds a "show more" toggle. While a search is active the whole string is shown, so a match past the cut stays visible.
+- `showValueTypes` adds a type badge next to every value: `string`, `int`, `float`, `bool`, `null`, `object`, `array`, `date` and so on.
+
+<Demo data={demos.largeData} />
+
+## Sort Keys
+
+Set `sortKeys` to show object keys in alphabetical order, or pass a comparator such as `(a, b) => b.localeCompare(a)`. Arrays keep their order, and so does the data: sorting only changes what is displayed, so paths and edits are unaffected. Memoize a comparator, since a new function on every render rebuilds the tree.
 
 ## Indent Guides
 
