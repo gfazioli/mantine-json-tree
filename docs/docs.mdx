@@ -1,3 +1,5 @@
+import { Table, Text } from '@mantine/core';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import { InstallScript } from './components/InstallScript/InstallScript';
 import * as demos from './demos';
 
@@ -40,6 +42,130 @@ You can import styles within a layer `@layer mantine-json-tree` by importing `@g
 ```tsx
 import '@gfazioli/mantine-json-tree/styles.layer.css';
 ```
+
+## Comparison with Mantine JsonViewer
+
+Since version 9.7, Mantine ships a first-party [JsonViewer](https://mantine.dev/code-highlight/json-viewer/) in `@mantine/code-highlight`. The basics overlap — collapsible nodes, copy to clipboard, type badges, diff highlighting, keyboard navigation — but the two make different trade-offs.
+
+export const Yes = () => <IconCheck size={20} stroke={2.5} color="var(--mantine-color-teal-6)" aria-label="Supported" />;
+
+export const No = () => <IconX size={18} stroke={2} color="var(--mantine-color-red-6)" aria-label="Not available" />;
+
+export const Cap = ({ title, note }) => (
+  <>
+    <Text size="sm" fw={500}>{title}</Text>
+    {note && <Text size="xs" c="dimmed">{note}</Text>}
+  </>
+);
+
+<Table striped withTableBorder withColumnBorders verticalSpacing="sm" my="md">
+  <Table.Thead>
+    <Table.Tr>
+      <Table.Th>Capability</Table.Th>
+      <Table.Th ta="center" w={140}>JsonTree</Table.Th>
+      <Table.Th ta="center" w={140}>JsonViewer</Table.Th>
+    </Table.Tr>
+  </Table.Thead>
+  <Table.Tbody>
+    <Table.Tr>
+      <Table.Td><Cap title="In-place editing" note="Strings, numbers and booleans, with validation and an immutable onChange" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Search" note="Filter keys and values, with highlighted matches and the matching branches expanded" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="JavaScript values as they are" note="Date, RegExp, Map, Set, BigInt, Symbol, NaN, Infinity, functions and React elements — core shows what JSON.stringify would: a Date as its ISO string, a Map or a Set as an empty object" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Header" note="Title, key count badge and a sticky header with its toolbar" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Indent guides" note="Colored vertical lines for each nesting level" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Path tooltip" note="The full path of a node on hover" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Responsive font size" note="size accepts breakpoint maps, applied with CSS only" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Function display" note="displayFunctions shows a function as a label, hides it or expands its properties" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Expand all, collapse all, copy all" note="withExpandAll and withCopyAll here, withControls and withCopyButton in core" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Copy a node" note="Both: a copy button on each row and Ctrl / ⌘ + C on the focused node" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Keyboard navigation" note="Both: an ARIA tree driven by the arrow keys — JsonTree through Mantine's Tree" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Type badges and item counts" note="showValueTypes / showItemsCount here, withTypes / withSize in core" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Sorted keys, long strings, long arrays" note="sortKeys, collapseStringsAfterLength and groupArraysAfterLength in both" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Diff highlighting" note="JsonTree: a highlightNode callback with added, removed and changed — core: a highlightItems map with added and removed" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Circular references" note="Both mark a value that points back at an ancestor as [Circular]" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Line numbers and controlled expansion" note="Both: line numbers, and the expanded nodes as controlled state" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Entry limit" note="maxDisplayLength shows the first 100 entries of an object or array and a &quot;… N more items&quot; row" /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Locked expansion" note="allExpanded expands every node and disables collapsing" /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Quote style" note="withQuotes and withKeyQuotes toggle the quotes around strings and keys" /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+  </Table.Tbody>
+</Table>
+
+**When to use which.** Reach for `JsonViewer` for a light, read-only view of JSON that came over the wire, especially if you already use `@mantine/code-highlight`, or when a huge object should show only its first entries. Reach for `JsonTree` when the data is a live JavaScript value — Dates, Maps, Sets, functions, circular graphs — when you need to search it or edit it in place, or when the tree is a tool of its own, with a title, a sticky toolbar and indent guides.
 
 ## Usage
 
