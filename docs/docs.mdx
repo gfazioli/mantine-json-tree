@@ -322,7 +322,7 @@ different branches is shared, not circular, so it keeps expanding normally in bo
 
 ## Diff Highlighting
 
-`highlightNode` is called for every node and returns how it changed: `'added'`, `'removed'`, `'changed'`, or `null` to leave it as is. It receives the node's `path`, `pathSegments`, `key`, `type` and `value`, so a diff can be computed against any previous version of the data — below, by reading the same `pathSegments` in both versions.
+`highlightNode` is called for every node except the synthetic `[start…end]` groups of `groupArraysAfterLength`, and returns how it changed: `'added'`, `'removed'`, `'changed'`, or `null` to leave it as is. It receives the node's `path`, `pathSegments`, `key`, `type` and `value`, so a diff can be computed against any previous version of the data — below, by reading the same `pathSegments` in both versions.
 
 The colors come from the `--json-tree-highlight-added-color`, `--json-tree-highlight-removed-color` and `--json-tree-highlight-changed-color` variables, and each highlighted row carries a `data-json-tree-highlight` attribute for your own styles.
 

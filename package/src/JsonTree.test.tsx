@@ -1428,3 +1428,51 @@ describe('JsonTree display options', () => {
     });
   });
 });
+
+describe('Containers with nothing to show', () => {
+  const secret = function secretFn() {
+    return 'SECRET';
+  };
+
+  it('never prints a hidden function through an array group', () => {
+    const { container } = render(
+      <JsonTree
+        data={{ list: [1, 2, secret, secret, 5] }}
+        defaultExpanded
+        maxDepth={-1}
+        displayFunctions="hide"
+        groupArraysAfterLength={2}
+      />
+    );
+    expect(container.textContent).not.toContain('SECRET');
+    expect(container.textContent).toContain('[0…1]');
+    expect(container.textContent).toContain('[4…4]');
+    // the group holding only hidden functions is left out
+    expect(container.textContent).not.toContain('[2…3]');
+  });
+
+  it('never prints a hidden function through an array that holds only functions', () => {
+    const { container } = render(
+      <JsonTree
+        data={{ list: [secret, secret] }}
+        defaultExpanded
+        maxDepth={-1}
+        displayFunctions="hide"
+      />
+    );
+    expect(container.textContent).not.toContain('SECRET');
+    expect(container.querySelector('[data-type="array"][data-value]')).toHaveAttribute(
+      'data-value',
+      '[]'
+    );
+  });
+
+  it('shows empty containers as {} and []', () => {
+    const { container } = render(<JsonTree data={{ a: {}, b: [] }} defaultExpanded />);
+    expect(container.textContent).not.toContain('[object Object]');
+    const values = Array.from(container.querySelectorAll('[data-value]')).map((el) =>
+      el.getAttribute('data-value')
+    );
+    expect(values).toEqual(expect.arrayContaining(['{}', '[]']));
+  });
+});

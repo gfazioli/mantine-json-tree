@@ -241,7 +241,7 @@ export interface JsonTreeBaseProps {
   /** Truncate string values longer than this many characters, with a toggle to show the full text */
   collapseStringsAfterLength?: number;
 
-  /** Return how a node changed to highlight it diff-style, or `null` to leave it as is */
+  /** Return how a node changed to highlight it diff-style, or `null` to leave it as is. Not called for the `[start…end]` groups of `groupArraysAfterLength` */
   highlightNode?: (payload: JsonTreeHighlightPayload) => JsonTreeHighlight | null | undefined;
 
   /** Whether to show a type badge (`string`, `int`, `float`, `bool`, `object`, …) next to every value @default false */
