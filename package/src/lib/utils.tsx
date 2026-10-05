@@ -239,6 +239,15 @@ export function formatValue(value: any, type: ValueType): string {
   if (type === 'circular') {
     return '[Circular]';
   }
+  // A container reaches this point only when it has nothing to show: it is empty,
+  // or `displayFunctions: 'hide'` filtered out every entry. `String()` would print
+  // "[object Object]" for an object and the hidden functions' source for an array.
+  if (type === 'object') {
+    return '{}';
+  }
+  if (type === 'array') {
+    return '[]';
+  }
   return String(value);
 }
 
@@ -504,12 +513,18 @@ export function convertToTreeData(
     children = [];
     for (let start = 0; start < entries.length; start += groupSize) {
       const end = Math.min(start + groupSize, entries.length) - 1;
+      const groupChildren = convertedChildren.slice(start, end + 1).filter(isShown);
+      // Every item hidden (`displayFunctions: 'hide'`): an empty group would render
+      // its slice as a value, functions included, so it is left out.
+      if (groupChildren.length === 0) {
+        continue;
+      }
       const label = `[${start}…${end}]`;
       const chunkPath = `${path}.${label}`;
       children.push({
         value: chunkPath,
         label,
-        children: convertedChildren.slice(start, end + 1).filter(isShown),
+        children: groupChildren,
         nodeData: {
           type: 'array',
           value: value.slice(start, end + 1),
