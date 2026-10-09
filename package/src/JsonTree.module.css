@@ -356,18 +356,19 @@
   transition: outline-color 120ms ease;
 
   &:hover {
-    outline-color: var(--json-tree-color-editable-outline, var(--mantine-color-blue-5));
+    outline-color: var(--json-tree-color-editable-outline);
   }
 }
 
-/* Add, move and remove stay out of the way until the tree is hovered, like copy */
+/* Add, move and remove stay out of the way: they show on the row under the pointer or
+   holding focus, and always on a touch screen, which has no hover to reveal them */
 .addButton,
 .removeButton,
 .moveButton {
   opacity: 0;
   transition: opacity 0.15s ease;
 
-  &:focus {
+  &:focus-visible {
     opacity: 1;
   }
 
@@ -376,19 +377,27 @@
   }
 }
 
-.root:hover .addButton,
-.root:hover .removeButton,
-.root:hover .moveButton {
-  opacity: 1;
+.removeButton:hover {
+  color: var(--mantine-color-red-filled);
 }
 
-.root:hover .moveButton:disabled {
-  opacity: 0.3;
-}
-
-/* A keyboard user focuses the row, not its buttons: show that row's own */
+:global(li[role='treeitem']) > :first-child:hover > .addButton,
+:global(li[role='treeitem']) > :first-child:hover > .removeButton,
+:global(li[role='treeitem']) > :first-child:hover > .moveButton:not(:disabled),
 :global(li[role='treeitem']:focus-visible) > :first-child > .addButton,
 :global(li[role='treeitem']:focus-visible) > :first-child > .removeButton,
 :global(li[role='treeitem']:focus-visible) > :first-child > .moveButton:not(:disabled) {
   opacity: 1;
+}
+
+:global(li[role='treeitem']) > :first-child:hover > .moveButton:disabled {
+  opacity: 0.3;
+}
+
+@media (hover: none) {
+  .addButton,
+  .removeButton,
+  .moveButton:not(:disabled) {
+    opacity: 1;
+  }
 }
