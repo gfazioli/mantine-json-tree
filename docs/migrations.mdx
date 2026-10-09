@@ -1,0 +1,26 @@
+## Upgrade guide
+
+This page collects the **breaking changes** and **migration steps** for each major version of `@gfazioli/mantine-json-tree`. If you are starting a new project, you can skip this page — everything here is about updating existing code from an older version.
+
+New features introduced in a release (that do not break anything) are **not** listed here. See the [GitHub Releases](https://github.com/gfazioli/mantine-json-tree/releases) page for the full changelog.
+
+## v3
+
+### Breaking changes in v3
+
+- **Mantine 9 and React 19 are required.** Mantine 7/8 and React 18 are no longer supported at runtime, even though `peerDependencies` stays wide to align with the other Mantine Extensions. This is the only consumer-facing break in [3.0.0](https://github.com/gfazioli/mantine-json-tree/releases/tag/3.0.0); the rest of that release moved the toolchain from prettier and eslint to oxfmt and oxlint, which only affects contributors.
+
+### Behaviour changes within v3
+
+- **Since 3.3.0, plain data shaped like `{ type, props }` renders as an object.** React elements are now identified by their `$$typeof` marker alone, so form-builder and low-code JSON such as `{ type: 'text', props: { label: 'Name' } }` is no longer collapsed into `<Component />`. Subtrees that used to be hidden are now visible. A serialized element (a `JSON.parse(JSON.stringify(element))` round-trip drops the marker) is shown as an ordinary object too.
+- **Since 3.3.0, the exported `ValueType` union includes `'circular'`.** Nothing changes at runtime, but an exhaustive `switch` over `ValueType` with a `never` guard needs a `'circular'` case.
+
+### Migration from v2 to v3
+
+1. Upgrade to Mantine 9 and React 19 — follow the [Mantine 9 migration guide](https://mantine.dev/guides/8x-to-9x/).
+2. Update the package: `yarn add @gfazioli/mantine-json-tree@^3`.
+3. If you switch exhaustively over `ValueType`, add a `'circular'` case.
+
+## v2
+
+[2.0.0](https://github.com/gfazioli/mantine-json-tree/releases/tag/2.0.0) was additive despite the major version: it added Date, BigInt, Symbol, RegExp, Map, Set and React element support. There is nothing to migrate.
