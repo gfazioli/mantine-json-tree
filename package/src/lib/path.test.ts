@@ -167,6 +167,13 @@ describe('structural edits', () => {
       expect(renameKeyAtPath({ a: 1 }, ['a'], 'a')).toEqual({ a: 1 });
     });
 
+    it('keeps symbol keys when renaming and removing', () => {
+      const tag = Symbol('tag');
+      const source = { a: 1, b: 2, [tag]: 'kept' };
+      expect((renameKeyAtPath(source, ['a'], 'z') as any)[tag]).toBe('kept');
+      expect((removeAtPath(source, ['b']) as any)[tag]).toBe('kept');
+    });
+
     it('stores a __proto__ key as data, never as the prototype', () => {
       const next = renameKeyAtPath({ a: 1 } as Record<string, unknown>, ['a'], '__proto__');
       expect(Object.getPrototypeOf(next)).toBe(Object.prototype);

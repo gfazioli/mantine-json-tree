@@ -8,6 +8,7 @@ import { setValueAtPath } from './lib/path';
 import {
   convertToTreeData,
   filterTreeBySearch,
+  findNodeBySegments,
   getArrayGroupSize,
   appendDraftRow,
   applyRemap,
@@ -2044,6 +2045,30 @@ describe('structural edits', () => {
       expect(values).not.toContain('');
     });
 
+    it('adds to the container it was asked to, when a dotted key shares its path', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(
+        <Controlled initial={{ 'a.b': { x: 1 }, a: { b: { y: 2 } } }} onChange={onChange} />
+      );
+      // both containers render as root.a.b; the second one is { y: 2 }, under a
+      const nested = Array.from(
+        container.querySelectorAll<HTMLElement>('li[role="treeitem"][data-value="root.a.b"]')
+      )[1];
+      await user.click(
+        Array.from(nested.querySelectorAll<HTMLElement>('[data-json-tree-action="add"]')).find(
+          (el) => el.closest('[role="treeitem"]') === nested
+        )!
+      );
+      expect(container.querySelectorAll('input')).toHaveLength(1);
+      await user.type(input(container), 'y{Enter}');
+      // 'y' exists in the nested object, not in the dotted one: refused there
+      expect(onChange).not.toHaveBeenCalled();
+      await user.clear(input(container));
+      await user.type(input(container), 'z{Enter}');
+      expect(onChange.mock.calls[0][0]).toEqual({ 'a.b': { x: 1 }, a: { b: { y: 2, z: 0 } } });
+    });
+
     it('rejects a key the object already has', async () => {
       const user = userEvent.setup();
       const onChange = jest.fn();
@@ -2292,9 +2317,8 @@ describe('structural edit helpers', () => {
   const tree = (value: unknown) => [convertToTreeData(value)];
 
   it('remaps every value below a renamed entry, and nothing else', () => {
-    const remap = remapContainerEntries(tree({ a: { b: { c: 1 } }, x: 1 }), 'root', (k) =>
-      k === 'a' ? 'z' : k
-    );
+    const nodes = tree({ a: { b: { c: 1 } }, x: 1 });
+    const remap = remapContainerEntries(nodes, nodes[0], (k) => (k === 'a' ? 'z' : k));
     expect(Object.fromEntries(remap.moves)).toEqual({
       'root.a': 'root.z',
       'root.a.b': 'root.z.b',
@@ -2306,7 +2330,8 @@ describe('structural edit helpers', () => {
   });
 
   it('drops a removed entry and shifts the indices after it', () => {
-    const remap = remapContainerEntries(tree(['a', ['b'], ['c']]), 'root', (k) =>
+    const nodes = tree(['a', ['b'], ['c']]);
+    const remap = remapContainerEntries(nodes, nodes[0], (k) =>
       k === '0' ? null : String(Number(k) - 1)
     );
     expect(applyRemap({ 'root.0': true, 'root.1': true, 'root.2': false }, remap)).toEqual({
@@ -2316,11 +2341,8 @@ describe('structural edit helpers', () => {
   });
 
   it('keeps a value an unmoved node shares with a moved one', () => {
-    const remap = remapContainerEntries(
-      tree({ a: { b: { x: 1 } }, 'a.b': { y: 2 } }),
-      'root',
-      (k) => (k === 'a' ? 'z' : k)
-    );
+    const nodes = tree({ a: { b: { x: 1 } }, 'a.b': { y: 2 } });
+    const remap = remapContainerEntries(nodes, nodes[0], (k) => (k === 'a' ? 'z' : k));
     expect(remap.keep.has('root.a.b')).toBe(true);
     expect(applyRemap({ 'root.a': true, 'root.a.b': true }, remap)).toEqual({
       'root.a.b': true,
@@ -2340,8 +2362,16 @@ describe('structural edit helpers', () => {
     expect(getDefaultNewValue([new Date()])).toBe('');
   });
 
+  it('finds a node by its address, whatever tree value it shares', () => {
+    const nodes = tree({ 'a.b': { x: 1 }, a: { b: { y: 2 } } });
+    expect(findNodeBySegments(nodes, ['a', 'b'])!.nodeData!.value).toEqual({ y: 2 });
+    expect(findNodeBySegments(nodes, ['a.b'])!.nodeData!.value).toEqual({ x: 1 });
+    expect(findNodeBySegments(nodes, [])!.value).toBe('root');
+    expect(findNodeBySegments(nodes, ['nope'])).toBeNull();
+  });
+
   it('appends the new-key row to the right container only', () => {
-    const [root] = appendDraftRow(tree({ a: { x: 1 }, b: { y: 2 } }), 'root.b');
+    const [root] = appendDraftRow(tree({ a: { x: 1 }, b: { y: 2 } }), 'root.b', ['b']);
     const [a, b] = root.children as any[];
     expect(a.children).toHaveLength(1);
     expect(b.children.at(-1).nodeData.draft).toEqual({ container: 'root.b' });

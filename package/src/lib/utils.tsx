@@ -816,11 +816,49 @@ export function findNodeByPath(
   return null;
 }
 
-/** Close the container whose tree value is `container` with a "new key" row. */
-export function appendDraftRow(nodes: JSONTreeNodeData[], container: string): JSONTreeNodeData[] {
+/** Whether two addresses are the same, step by step (an index never equals a numeric key) */
+export function sameSegments(a: JsonTreePathSegments | undefined, b: JsonTreePathSegments) {
+  return a !== undefined && a.length === b.length && a.every((segment, i) => segment === b[i]);
+}
+
+/**
+ * The node at an address. Unlike `findNodeByPath`, it cannot be fooled by two
+ * nodes sharing a tree value (`{ 'a.b': … }` and `{ a: { b: … } }`).
+ */
+export function findNodeBySegments(
+  nodes: JSONTreeNodeData[],
+  segments: JsonTreePathSegments
+): JSONTreeNodeData | null {
+  for (const node of nodes) {
+    const own = node.nodeData?.pathSegments;
+    if (sameSegments(own, segments)) {
+      return node;
+    }
+    // only a node on the way down can hold it; groups have no address but hold items
+    if (
+      own === undefined ? node.nodeData?.chunk : sameSegments(own, segments.slice(0, own.length))
+    ) {
+      const found = findNodeBySegments((node.children ?? []) as JSONTreeNodeData[], segments);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Close the container at `segments` (tree value `container`) with a "new key"
+ * row. Both must match: another node can share the tree value.
+ */
+export function appendDraftRow(
+  nodes: JSONTreeNodeData[],
+  container: string,
+  segments: JsonTreePathSegments
+): JSONTreeNodeData[] {
   return mapNodes(nodes, (node) => {
     const children = node.children as JSONTreeNodeData[] | undefined;
-    if (node.value === container) {
+    if (node.value === container && sameSegments(node.nodeData?.pathSegments, segments)) {
       const nd = node.nodeData;
       const draft: JSONTreeNodeData = {
         value: `${container}${DRAFT_ROW_SUFFIX}`,
@@ -835,7 +873,7 @@ export function appendDraftRow(nodes: JSONTreeNodeData[], container: string): JS
       };
       return { ...node, children: [...(children ?? []), draft] };
     }
-    const next = children && appendDraftRow(children, container);
+    const next = children && appendDraftRow(children, container, segments);
     return next && next !== children ? { ...node, children: next } : node;
   });
 }
@@ -873,15 +911,12 @@ export interface TreeRemap {
  */
 export function remapContainerEntries(
   nodes: JSONTreeNodeData[],
-  container: string,
+  node: JSONTreeNodeData,
   mapKey: (key: string) => string | null
 ): TreeRemap {
   const moves = new Map<string, string | null>();
   const keep = new Set<string>();
-  const node = findNodeByPath(nodes, container);
-  if (!node) {
-    return { moves, keep };
-  }
+  const container = node.value;
 
   const moved = new Set<JSONTreeNodeData>();
   const walk = (current: JSONTreeNodeData, from: string, to: string | null) => {

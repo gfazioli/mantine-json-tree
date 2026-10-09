@@ -63,6 +63,7 @@ import {
   convertToTreeData,
   filterTreeBySearch,
   findNodeByPath,
+  findNodeBySegments,
   formatKey,
   formatValue,
   getArrayGroupSize,
@@ -663,8 +664,9 @@ interface RenderNodeContext {
   onRename?: (node: JSONTreeNodeData, key: string) => void;
   onCancelStructure?: () => void;
   onStartAdd?: (node: JSONTreeNodeData, row: HTMLElement | null) => void;
-  validateNewKey?: (container: string, key: string) => string | null;
-  onAddKey?: (container: string, key: string) => void;
+  /** Vet and commit the key typed in the "new key" row */
+  validateNewKey?: (key: string) => string | null;
+  onAddKey?: (key: string) => void;
   onRemove?: (node: JSONTreeNodeData) => void;
   onMove?: (node: JSONTreeNodeData, direction: -1 | 1) => void;
   searchQuery?: string;
@@ -884,8 +886,8 @@ function renderJSONNode(
             value: '',
             label: 'New key',
             placeholder: 'key',
-            validate: (next) => ctx.validateNewKey?.(draft!.container, next) ?? null,
-            commit: (next) => ctx.onAddKey?.(draft!.container, next),
+            validate: (next) => ctx.validateNewKey?.(next) ?? null,
+            commit: (next) => ctx.onAddKey?.(next),
           })
         )}
       </Group>
@@ -1566,11 +1568,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Only the address lives here — the draft stays inside the editor, so typing
   // never re-renders the tree.
   const [editor, setEditor] = useState<
-    { kind: 'value' | 'rename'; key: string } | { kind: 'add'; container: string } | null
+    | { kind: 'value' | 'rename'; key: string }
+    | { kind: 'add'; container: string; segments: JsonTreePathSegments }
+    | null
   >(null);
   const editingKey = editor?.kind === 'value' ? editor.key : null;
   const renamingKey = editor?.kind === 'rename' ? editor.key : null;
-  const addingTo = editor?.kind === 'add' ? editor.container : null;
+  const addingTo = editor?.kind === 'add' ? editor : null;
   // The row that owns the open editor, or the tree value of a row that does not
   // exist yet (a key just added). When the editor unmounts its input goes with
   // it and focus falls to the body, which drops a keyboard user out of the tree
@@ -1838,30 +1842,47 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
   };
 
-  const containerPayload = (container: string) => {
-    const node = findNodeByPath(treeData, container);
-    return node ? nodePayload(node) : null;
+  /**
+   * The container at an address, read from `data`. By address, never by tree
+   * value: `{ 'a.b': … }` and `{ a: { b: … } }` share one.
+   */
+  const payloadAt = (path: string, pathSegments: JsonTreePathSegments): JsonTreeNodePayload => {
+    const value = getValueAtPath(data, pathSegments);
+    const last = pathSegments[pathSegments.length - 1];
+    return {
+      path,
+      pathSegments,
+      key: last === undefined ? undefined : String(last),
+      type: getValueType(value),
+      value,
+    };
   };
 
-  /** Vet a key typed for `container`; a rename may keep its own `currentKey` */
-  const validateNewKey = (container: string, key: string, currentKey?: string) => {
-    const payload = containerPayload(container);
-    if (!payload) {
-      return null;
-    }
-    if (key !== currentKey && Object.hasOwn(payload.value as object, key)) {
+  /** The tree node at an address, in the full tree */
+  const nodeAt = (pathSegments: JsonTreePathSegments) => findNodeBySegments(treeData, pathSegments);
+
+  /** Vet a key typed for a container; a rename may keep its own `currentKey` */
+  const vetKey = (container: JsonTreeNodePayload, key: string, currentKey?: string) => {
+    if (key !== currentKey && Object.hasOwn(container.value as object, key)) {
       return 'Key already exists';
     }
-    return validateKey?.(key, payload) ?? null;
+    return validateKey?.(key, container) ?? null;
   };
+
+  const validateNewKey = (key: string) =>
+    addingTo ? vetKey(payloadAt(addingTo.container, addingTo.segments), key) : null;
 
   const handleStartRename = (key: string, row: HTMLElement | null) => {
     editingRowRef.current = row;
     setEditor({ kind: 'rename', key });
   };
 
-  const validateRename = (node: JSONTreeNodeData, nextKey: string) =>
-    validateNewKey(parentTreeValue(node), nextKey, node.nodeData?.key);
+  const validateRename = (node: JSONTreeNodeData, nextKey: string) => {
+    const segments = node.nodeData?.pathSegments;
+    return segments
+      ? vetKey(payloadAt(parentTreeValue(node), segments.slice(0, -1)), nextKey, node.nodeData?.key)
+      : null;
+  };
 
   const handleRename = (node: JSONTreeNodeData, nextKey: string) => {
     setEditor(null);
@@ -1871,11 +1892,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       return;
     }
     const parent = parentTreeValue(node);
+    const parentNode = nodeAt(payload.pathSegments.slice(0, -1));
     commitStructuralChange(
       renameKeyAtPath(data, payload.pathSegments, nextKey),
       relocated(payload, parent, nextKey, 'rename'),
       {
-        remap: remapContainerEntries(treeData, parent, (k) => (k === key ? nextKey : k)),
+        remap: parentNode
+          ? remapContainerEntries(treeData, parentNode, (k) => (k === key ? nextKey : k))
+          : undefined,
         focus: [childTreeValue(parent, nextKey)],
       }
     );
@@ -1893,7 +1917,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     if (!Array.isArray(payload.value)) {
       // An object needs a key first: a "new key" row opens inside it
       editingRowRef.current = row;
-      setEditor({ kind: 'add', container: node.value });
+      setEditor({ kind: 'add', container: node.value, segments: payload.pathSegments });
       if (!allExpanded && !tree.expandedState[node.value]) {
         writeExpanded({ ...tree.expandedState, [node.value]: true });
       }
@@ -1906,7 +1930,11 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     const index = payload.value.length;
     const added = childPayload(payload, index, value);
     const remap: TreeRemap = { moves: new Map(), keep: new Set() };
-    remapGroups(node, index + 1, remap);
+    // the full node, not the row on screen, which a search or a limit may have cut
+    const full = nodeAt(payload.pathSegments);
+    if (full) {
+      remapGroups(full, index + 1, remap);
+    }
     commitStructuralChange(
       insertAtPath(data, payload.pathSegments, undefined, value),
       { ...added, action: 'add', previousValue: undefined },
@@ -1919,10 +1947,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     editOrFocusNew(childTreeValue(node.value, index), added);
   };
 
-  const handleAddKey = (container: string, key: string) => {
+  const handleAddKey = (key: string) => {
     setEditor(null);
-    const payload = containerPayload(container);
-    if (!payload || Array.isArray(payload.value) || !isWritableContainer(payload.value)) {
+    if (!addingTo) {
+      return;
+    }
+    const { container } = addingTo;
+    const payload = payloadAt(container, addingTo.segments);
+    if (Array.isArray(payload.value) || !isWritableContainer(payload.value)) {
       return;
     }
     const value = newValueFor(payload);
@@ -1944,18 +1976,20 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     setEditor(null);
 
     const parent = parentTreeValue(node);
-    const parentNode = findNodeByPath(treeData, parent);
+    const parentNode = nodeAt(payload.pathSegments.slice(0, -1));
     const last = payload.pathSegments[payload.pathSegments.length - 1];
-    const remap = remapContainerEntries(
-      treeData,
-      parent,
-      typeof last === 'number'
-        ? (k) => {
-            const index = Number(k);
-            return index === last ? null : index > last ? String(index - 1) : k;
-          }
-        : (k) => (k === key ? null : k)
-    );
+    const remap: TreeRemap = parentNode
+      ? remapContainerEntries(
+          treeData,
+          parentNode,
+          typeof last === 'number'
+            ? (k) => {
+                const index = Number(k);
+                return index === last ? null : index > last ? String(index - 1) : k;
+              }
+            : (k) => (k === key ? null : k)
+        )
+      : { moves: new Map(), keep: new Set() };
     if (typeof last === 'number' && parentNode) {
       remapGroups(parentNode, getParentLength(node) - 1, remap);
     }
@@ -1989,13 +2023,16 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       return;
     }
     const parent = parentTreeValue(node);
+    const parentNode = nodeAt(payload.pathSegments.slice(0, -1));
     commitStructuralChange(
       moveAtPath(data, payload.pathSegments, to),
       relocated(payload, parent, to, 'reorder'),
       {
-        remap: remapContainerEntries(treeData, parent, (k) =>
-          Number(k) === last ? String(to) : Number(k) === to ? String(last) : k
-        ),
+        remap: parentNode
+          ? remapContainerEntries(treeData, parentNode, (k) =>
+              Number(k) === last ? String(to) : Number(k) === to ? String(last) : k
+            )
+          : undefined,
         expand: [groupValue(parent, to, length)],
         focus: [childTreeValue(parent, to)],
       }
@@ -2134,7 +2171,10 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   // The rows on screen: the "new key" row joins the object a key is being added to
   const displayedTreeData = useMemo(
-    () => (addingTo ? appendDraftRow(filteredTreeData, addingTo) : filteredTreeData),
+    () =>
+      addingTo
+        ? appendDraftRow(filteredTreeData, addingTo.container, addingTo.segments)
+        : filteredTreeData,
     [filteredTreeData, addingTo]
   );
 
