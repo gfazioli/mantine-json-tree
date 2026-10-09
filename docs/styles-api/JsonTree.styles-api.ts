@@ -27,6 +27,11 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     valueEditor: 'Wrapper around the inline editor shown while a value is being edited',
     typeBadge: 'Type badge next to every value, shown with showValueTypes',
     showMore: 'Toggle that reveals a string cut by collapseStringsAfterLength',
+    moreItems: 'Button closing a container cut by maxDisplayLength, revealing its next entries',
+    keyEditor: 'Wrapper around the inline input shown while a key is renamed or added',
+    addButton: 'Button that adds a key or an item to a container (structuralEdits)',
+    removeButton: 'Button that removes a key or an item (structuralEdits)',
+    moveButton: 'Buttons that move an array item up or down (structuralEdits)',
   },
 
   vars: {
@@ -43,6 +48,8 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     },
     key: {
       '--json-tree-color-key': 'Color for object keys',
+      '--json-tree-color-editable-outline':
+        'Outline color shown when hovering a key that can be renamed',
     },
 
     value: {
@@ -82,6 +89,11 @@ export const JsonTreeStylesApi: StylesApiData<JsonTreeFactory> = {
     valueEditor: {},
     typeBadge: {},
     showMore: {},
+    moreItems: {},
+    keyEditor: {},
+    addButton: {},
+    removeButton: {},
+    moveButton: {},
     lineNumber: {
       '--json-tree-color-line-number': 'Color for line numbers',
     },

@@ -38,6 +38,9 @@ export const configurator: MantineDemo = {
     { type: 'boolean', prop: 'showPathOnHover', initialValue: true, libraryValue: false },
     { type: 'boolean', prop: 'showValueTypes', initialValue: false, libraryValue: false },
     { type: 'boolean', prop: 'sortKeys', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'withQuotes', initialValue: true, libraryValue: true },
+    { type: 'boolean', prop: 'withKeyQuotes', initialValue: false, libraryValue: false },
+    { type: 'boolean', prop: 'allExpanded', initialValue: false, libraryValue: false },
     {
       type: 'select',
       prop: 'displayFunctions',

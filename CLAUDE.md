@@ -39,7 +39,8 @@ JsonTree.story.tsx    # Storybook stories
 JsonTree.test.tsx     # Jest unit test
 index.ts              # Public exports
 lib/
-  utils.tsx           # Tree data conversion, type detection, value formatting
+  utils.tsx           # Tree data conversion, type detection, value formatting, display passes, remaps
+  path.ts             # Writes by pathSegments: set, rename, insert, remove, move (spine-only copies)
 ```
 
 Single-component package — `JsonTree` is the only exported component, built with Mantine's `factory<JsonTreeFactory>` pattern (`useProps`, `useStyles`, `createVarsResolver`). The `renderJSONNode` function is extracted outside the factory for performance (avoids recreation on every render).
@@ -77,6 +78,17 @@ Inspired by Mantine 9.7's `JsonViewer`:
 - `collapseStringsAfterLength` is rendered by `CollapsibleString` (a component, since `renderJSONNode` is a plain function and the open state must live with the row). It never cuts while a search is active, and never splits a surrogate pair.
 - `highlightNode(payload)` sets `data-json-tree-highlight` on the row; the tints are scheme-dependent CSS defaults (`var(--json-tree-highlight-*-color, …)` with `where-dark`), because a `varsResolver` value is an inline style that one color scheme cannot override. The vars stay in the resolver as `undefined` so `vars` can still set them.
 
+### Display passes over the tree (maxDisplayLength, structural editing)
+`treeData` is the full tree; what `<Tree>` renders is `treeData` → `filterTreeBySearch` (while searching) **or** `limitTreeEntries` (`maxDisplayLength`) → `appendDraftRow` (while a key is being added). Search, copy, expand all and the key count always read `treeData`, never the displayed tree.
+- Synthetic rows are told apart by `nodeData`: `chunk` (array group), `more` (the "… N more" row), `draft` (the new-key input). Their tree values end in a NUL suffix (`MORE_ROW_SUFFIX`, `DRAFT_ROW_SUFFIX`), so they can never collide with a real path. `renderJSONNode` renders `more` and `draft` before anything else, and none of them is passed to `highlightNode` or `onNodeClick`.
+- `nodeData.parentType` is the type of the container an entry lives in: `withKeyQuotes` quotes only `parentType === 'object'`.
+
+### allExpanded
+The `<Tree>` gets a wrapped controller whose `expandedState` is `getTreeExpandedState(displayedTreeData, '*')` and whose expand/collapse/toggle are no-ops. Mantine 9.7.0 sets no `aria-expanded` on the `li`, so the capture handler finds an open node by its `role="group"` child.
+
+### Structural editing (structuralEdits)
+Writes go through `pathSegments` (`renameKeyAtPath`, `insertAtPath`, `removeAtPath`, `moveAtPath`); the display `path` stays a label. Expanded state and revealed pages are keyed by tree value, which a rename or an index shift changes for a whole subtree, so `commitStructuralChange` re-keys them with `remapContainerEntries` (a walk of the tree, not prefix matching; values an unmoved node shares, like `{ 'a.b' }` vs `{ a: { b } }`, go in `keep`) and the `[start…end]` groups with `remapGroups`. Focus after a change goes through `pendingFocus` (tree values, first rendered one wins); after an editor closes, through `editingRowRef` (an element, or a tree value for a row that did not exist yet). Keyboard shortcuts click the row's own control (`[data-json-tree-action]`, `[data-renamable]`), so mouse and keyboard share one path; Alt+arrows are caught in the capture phase because Mantine's Tree stops arrow keys on the `li`.
+
 ### Responsive CSS (size prop)
 The `size` prop supports responsive breakpoint objects via CSS-native approach (`StyleProp<T>`). `JsonTreeMediaVariables` component uses `InlineStyles` + CSS media queries to set `--json-tree-font-size` per breakpoint — no JavaScript re-renders. Pattern follows Mantine core's `SimpleGridMediaVariables` and `mantine-select-stepper`'s `SelectStepperMediaVariables`. Uses `useRandomClassName` for scoped selectors.
 
@@ -91,7 +103,7 @@ The `varsResolver` maps props to CSS variables across multiple style targets:
 - **indentGuide**: 5 rotating color variables (`--json-tree-indent-guide-color-0` through `4`)
 
 ### Styles API selectors
-`root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`, `valueEditor`, `typeBadge`, `showMore`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
+`root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`, `valueEditor`, `typeBadge`, `showMore`, `moreItems`, `keyEditor`, `addButton`, `removeButton`, `moveButton`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
 
 ### Indent guides
 When `showIndentGuides` is enabled, absolutely-positioned `<div>` elements are rendered for each depth level with cycling colors (5-color palette via `data-color-index`). Guide position: `left = depth * 32 + 8px` (matching Mantine Tree's `levelOffset={32}`).

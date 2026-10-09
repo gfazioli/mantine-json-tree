@@ -3,8 +3,14 @@ import { IconCheck, IconX } from '@tabler/icons-react';
 import { InstallScript } from './components/InstallScript/InstallScript';
 import * as demos from './demos';
 
+> **Upgrading from an older major version?** See the [Upgrade guide](/?t=migrations) for breaking changes and step-by-step migration instructions.
+
 ## What's new
 
+- **Structural editing** — rename keys, add and remove keys and items, reorder arrays (`structuralEdits`)
+- **Entry limit** — long objects and arrays end with a "… N more" row that reveals the next page (`maxDisplayLength`)
+- **Locked expansion** — every node open, none can be collapsed (`allExpanded`)
+- **Quote style** — show or hide the quotes around strings and keys (`withQuotes`, `withKeyQuotes`)
 - **Diff highlighting** — mark nodes as added, removed or changed (`highlightNode`)
 - **Large arrays** split into collapsible `[start…end]` groups (`groupArraysAfterLength`)
 - **Long strings** cut with a "show more" toggle (`collapseStringsAfterLength`)
@@ -73,6 +79,11 @@ export const Cap = ({ title, note }) => (
       <Table.Td ta="center"><No /></Table.Td>
     </Table.Tr>
     <Table.Tr>
+      <Table.Td><Cap title="Structural editing" note="Rename keys, add and remove keys and items, reorder an array — expanded nodes and focus follow every change" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><No /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
       <Table.Td><Cap title="Search" note="Filter keys and values, with highlighted matches and the matching branches expanded" /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
       <Table.Td ta="center"><No /></Table.Td>
@@ -133,6 +144,21 @@ export const Cap = ({ title, note }) => (
       <Table.Td ta="center"><Yes /></Table.Td>
     </Table.Tr>
     <Table.Tr>
+      <Table.Td><Cap title="Entry limit" note="maxDisplayLength in both — here the &quot;… N more items&quot; row is a button that reveals the next page, and a search still reaches every entry; in core it is plain text" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Locked expansion" note="allExpanded in both: every node open, array groups included, and collapsing disabled" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Quote style" note="withQuotes and withKeyQuotes in both, with the same defaults" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
       <Table.Td><Cap title="Diff highlighting" note="JsonTree: a highlightNode callback with added, removed and changed — core: a highlightItems map with added and removed" /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
@@ -147,25 +173,10 @@ export const Cap = ({ title, note }) => (
       <Table.Td ta="center"><Yes /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
     </Table.Tr>
-    <Table.Tr>
-      <Table.Td><Cap title="Entry limit" note="maxDisplayLength shows the first 100 entries of an object or array and a &quot;… N more items&quot; row" /></Table.Td>
-      <Table.Td ta="center"><No /></Table.Td>
-      <Table.Td ta="center"><Yes /></Table.Td>
-    </Table.Tr>
-    <Table.Tr>
-      <Table.Td><Cap title="Locked expansion" note="allExpanded expands every node and disables collapsing" /></Table.Td>
-      <Table.Td ta="center"><No /></Table.Td>
-      <Table.Td ta="center"><Yes /></Table.Td>
-    </Table.Tr>
-    <Table.Tr>
-      <Table.Td><Cap title="Quote style" note="withQuotes and withKeyQuotes toggle the quotes around strings and keys" /></Table.Td>
-      <Table.Td ta="center"><No /></Table.Td>
-      <Table.Td ta="center"><Yes /></Table.Td>
-    </Table.Tr>
   </Table.Tbody>
 </Table>
 
-**When to use which.** Reach for `JsonViewer` for a light, read-only view of JSON that came over the wire, especially if you already use `@mantine/code-highlight`, or when a huge object should show only its first entries. Reach for `JsonTree` when the data is a live JavaScript value — Dates, Maps, Sets, functions, circular graphs — when you need to search it or edit it in place, or when the tree is a tool of its own, with a title, a sticky toolbar and indent guides.
+**When to use which.** Reach for `JsonViewer` for a light, read-only view of JSON that came over the wire, especially if you already use `@mantine/code-highlight`. Reach for `JsonTree` when the data is a live JavaScript value — Dates, Maps, Sets, functions, circular graphs — when you need to search it, or to edit it in place, values and structure alike, or when the tree is a tool of its own, with a title, a sticky toolbar and indent guides.
 
 ## Usage
 
@@ -234,6 +245,37 @@ Two kinds of node can never be edited, whatever you put in that list:
 
 Use `path` for display and logging; use `pathSegments` whenever you need to act on the node.
 
+## Editing Structure
+
+Add `structuralEdits` to `editable` and the reader can change the shape of the data too: rename
+an object key, add a key or an item, remove one, and move the items of an array. Pass `true` for
+all four, or a list such as `['add', 'remove']` for some of them.
+
+- **Rename**: click a key, or press `F2` on its row, and type the new name. A key the object
+  already has is refused, and `validateKey` can refuse others.
+- **Add**: the `+` button on an object asks for the new key; on an array it appends an item. A new
+  entry starts with the type of the container's last entry, emptied (`''`, `0`, `false`, `null`,
+  `{}`, `[]`), or with whatever `getNewValue` returns; a new string or number opens its editor at
+  once.
+- **Remove**: the bin button, or `Delete` / `Backspace` on the focused row.
+- **Reorder**: the arrow buttons on an array item, or `Alt + ↑ / ↓`.
+
+<Demo data={demos.structural} />
+
+`onChange` reports each change with an `action` — `'edit'` for a value, or `'rename'`, `'add'`,
+`'remove'` and `'reorder'` — and a rename or a reorder also carries `previousPath`,
+`previousPathSegments` and `previousKey`. Every write goes through `pathSegments`, so it lands on
+the node you meant even when two keys share a display path, and, as with values, only the spine
+down to the change is rebuilt.
+
+Keys and indices are part of every path below them, so a rename or a shifted index changes the
+path of a whole subtree. `JsonTree` carries its own state across: expanded nodes stay expanded
+under their new paths (a controlled `expanded` gets the new list through `onExpandedChange`),
+revealed pages stay revealed, and focus follows the change — to the renamed row, the moved item,
+or the entry that took a removed one's place. The same entries as for values stay read-only:
+`Map` and `Set` entries, the `[start…end]` groups, reference cycles, and whatever `isEditable`
+refuses.
+
 ## Search
 
 Enable `withSearch` to add a search toggle in the toolbar.
@@ -285,6 +327,16 @@ output:
 Below is an example of syntax highlighting for different JSON value types: strings, numbers, booleans, nulls, objects, and arrays. Each type is displayed in a distinct color for better readability.
 
 <Demo data={demos.values} />
+
+## Quote Style
+
+Strings are shown between quotes and object keys without them, as Mantine's `JsonViewer` does by
+default. `withQuotes={false}` drops the quotes around strings, and `withKeyQuotes` adds them
+around object keys — never around an array index, a `Map` or `Set` entry or a group label, which
+JSON would not quote either. Search matches the text as it is displayed, and copying still
+produces valid JSON.
+
+<Demo data={demos.quotes} />
 
 ## Special Value Types
 
@@ -338,6 +390,16 @@ Three props keep big payloads readable:
 
 <Demo data={demos.largeData} />
 
+### Entry limit
+
+`maxDisplayLength` shows at most that many entries of an object, array, `Map` or `Set`, and closes
+it with a "… N more items" row. That row is a button: a click, or `Enter` on the focused row,
+reveals the next as many entries and moves focus to the first of them. An array split by
+`groupArraysAfterLength` is left whole, and the limit is off while a search is active, so no match
+hides behind it. Copy, search, expand all and the key count badge always work on the full value.
+
+<Demo data={demos.entryLimit} />
+
 ## Sort Keys
 
 Set `sortKeys` to show object keys in alphabetical order, or pass a comparator such as `(a, b) => b.localeCompare(a)`. Arrays keep their order, and so does the data: sorting only changes what is displayed, so paths and edits are unaffected. Memoize a comparator, since a new function on every render rebuilds the tree.
@@ -390,13 +452,17 @@ Use the `onNodeClick` callback to handle clicks on any node in the tree, and the
 
 - **Arrow Up/Down**: Navigate between nodes
 - **Arrow Right**: Expand a collapsed node or move to first child
-- **Arrow Left**: Collapse an expanded node or move to parent
+- **Arrow Left**: Collapse an expanded node or move to parent (with `allExpanded`, always move to
+  the parent)
 - **Space**: Toggle node expansion
 - **Enter**: Open the inline editor for the focused row (when `editable` is enabled). Editable
   values add no tab stop of their own, so a large tree stays one stop, as Mantine's Tree intends
 - **Ctrl+C / Cmd+C**: Copy the focused node's value to clipboard (when `withCopyToClipboard` is
   enabled). With no node focused it falls back to the root, and it never intercepts the shortcut
   while a form control inside the component — such as the search input — holds focus.
+- **Enter** on a "… N more items" row: reveal the next entries (`maxDisplayLength`)
+- With `structuralEdits`: **F2** renames the focused key, **Delete** / **Backspace** removes the
+  focused row, **Insert** / **+** adds to it, and **Alt + Arrow Up/Down** moves an array item
 
 ## Path Tooltip
 
@@ -428,6 +494,15 @@ const [expanded, setExpanded] = useState<string[]>([
   onCollapse={(path) => console.log('Collapsed:', path)}
 />;
 ```
+
+## Locked Expansion
+
+`allExpanded` opens every node, array groups included, and keeps them open: the toggles and the
+expand/collapse all controls disappear, and neither the mouse nor the keyboard can collapse a
+node. It suits a static payload in documentation or a report. `defaultExpanded`, `maxDepth` and a
+controlled `expanded` are ignored while it is on.
+
+<Demo data={demos.allExpanded} />
 
 ## Responsive size
 

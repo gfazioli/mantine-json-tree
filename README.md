@@ -22,7 +22,7 @@ It requires **Mantine 9.x** and **React 19**.
 
 [Mantine JsonTree](https://gfazioli.github.io/mantine-json-tree) provides a structured, interactive view of heterogeneous data—strings, numbers, booleans, nulls, objects, arrays, and even functions—organized as a collapsible tree. Developers can control initial expansion, show visual indent guides, and customize expand/collapse controls with arbitrary React nodes (e.g., emojis or styled icons) to match their design system. For function values, the component offers flexible rendering modes: show the function signature as text, hide functions entirely, or inspect them as objects when needed.
 
-Set `editable` and the same tree becomes an editor: click a string or a number to change it in place, click a boolean to toggle it. Updates are immutable and rebuild only the path down to the edited node, so every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element elsewhere in the tree keeps its identity.
+Set `editable` and the same tree becomes an editor: click a string or a number to change it in place, click a boolean to toggle it. Add `structuralEdits` and the reader can rename keys, add and remove keys and items, and reorder arrays, with expanded nodes and focus following every change. Updates are immutable and rebuild only the path down to the change, so every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element elsewhere in the tree keeps its identity.
 
 Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTree integrates cleanly into dashboards, developer tools, and documentation pages where readable, navigable data visualization is essential.
 
@@ -31,9 +31,13 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - Interactive collapsible tree view for any JSON-serializable data
 - **In-place editing** of strings, numbers and booleans (`editable`, `onChange`) — immutable updates that
   leave every `Date`, `Map`, `Set`, `RegExp`, `BigInt`, function and React element in the tree untouched
+- **Structural editing**: rename keys, add and remove keys and items, reorder arrays (`structuralEdits`),
+  from the mouse or the keyboard
 - **Search** with text highlight, filtered tree view, and auto-expand matching branches
 - **Diff highlighting**: mark nodes as added, removed or changed with `highlightNode`
-- **Large data**: long arrays split into collapsible `[start…end]` groups (`groupArraysAfterLength`), long strings cut with a "show more" toggle (`collapseStringsAfterLength`)
+- **Large data**: long arrays split into collapsible `[start…end]` groups (`groupArraysAfterLength`), long strings cut with a "show more" toggle (`collapseStringsAfterLength`), and long objects or arrays cut to their first entries with a "… N more" row that reveals the next page (`maxDisplayLength`)
+- **Locked expansion**: every node open and none collapsible (`allExpanded`)
+- **Quote style**: show or hide the quotes around strings and keys (`withQuotes`, `withKeyQuotes`)
 - **Type badges** next to every value (`showValueTypes`) and **sorted keys** (`sortKeys`)
 - **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
 - **Paper wrapper** with `withBorder` for bordered container look
@@ -53,7 +57,7 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - Sticky header support with configurable offset
 - Function display modes: as-string, hide, or as-object introspection
 - Responsive font size via Mantine breakpoint objects (CSS-native, no re-renders)
-- Full Mantine Styles API support with 24 style selectors and 25+ CSS variables
+- Full Mantine Styles API support with 29 style selectors and 25+ CSS variables
 - Custom icons for expand/collapse and copy controls
 - Item count badges for objects and arrays
 - `onExpand`, `onCollapse`, `onNodeClick`, `onCopy`, and `onCopyAll` callbacks

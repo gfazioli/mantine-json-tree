@@ -18,3 +18,7 @@ export { sticky } from './JsonTree.demo.sticky';
 export { styled } from './JsonTree.demo.styled';
 export { stylesApi } from './JsonTree.demo.stylesApi';
 export { values } from './JsonTree.demo.values';
+export { allExpanded } from './JsonTree.demo.allExpanded';
+export { entryLimit } from './JsonTree.demo.entryLimit';
+export { quotes } from './JsonTree.demo.quotes';
+export { structural } from './JsonTree.demo.structural';
