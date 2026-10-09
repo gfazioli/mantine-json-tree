@@ -123,7 +123,7 @@ export type JsonTreeCssVariables = {
     | '--json-tree-highlight-removed-color'
     | '--json-tree-highlight-changed-color';
   header: '--json-tree-header-background-color' | '--json-tree-header-sticky-offset';
-  key: '--json-tree-color-key';
+  key: '--json-tree-color-key' | '--json-tree-color-editable-outline';
   value:
     | '--json-tree-color-string'
     | '--json-tree-color-number'
@@ -897,6 +897,7 @@ function renderJSONNode(
             editorProps={{
               ...ctx.editorProps,
               'aria-label': ctx.editorProps?.['aria-label'] ?? 'New key',
+              placeholder: ctx.editorProps?.placeholder ?? 'key',
             }}
             validate={(next) => ctx.validateNewKey?.(draft.container, String(next)) ?? null}
             onCommit={(next) => ctx.onAddKey?.(draft.container, String(next))}
@@ -1029,7 +1030,7 @@ function renderJSONNode(
           <ActionIcon
             size="xs"
             variant="subtle"
-            color="red"
+            color="gray"
             aria-label="Remove"
             data-json-tree-action="remove"
             {...getStyles('removeButton')}
@@ -1205,7 +1206,19 @@ function renderJSONNode(
     >
       {lineNumber}
       {renderIndentGuides()}
-      {!ctx.locked && (
+      {ctx.locked ? (
+        // A locked node has no toggle, but keeps its room: the keys stay where
+        // they are with or without allExpanded
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          disabled
+          tabIndex={-1}
+          aria-hidden
+          data-locked
+          {...getStyles('expandCollapse', { style: { visibility: 'hidden' } })}
+        />
+      ) : (
         <ActionIcon
           size="xs"
           variant="subtle"
@@ -1275,6 +1288,8 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       },
       key: {
         '--json-tree-color-key': 'var(--mantine-color-blue-5)',
+        // the outline a renamable key shows on hover; only emitted when editing is on
+        '--json-tree-color-editable-outline': editable ? 'var(--mantine-color-blue-5)' : undefined,
       },
       value: {
         '--json-tree-color-string': 'var(--mantine-color-green-7)',

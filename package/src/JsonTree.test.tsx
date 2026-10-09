@@ -1578,9 +1578,16 @@ describe('allExpanded', () => {
     parents.forEach((el) => expect(el).toHaveAttribute('data-expanded', 'true'));
   });
 
-  it('hides the node toggles and the expand/collapse all controls', () => {
+  it('hides the node toggles, keeping their room, and the expand/collapse all controls', () => {
     const { container } = render(<JsonTree data={data} allExpanded withExpandAll title="Data" />);
-    expect(container.querySelector('.expandCollapse')).toBeNull();
+    const toggles = Array.from(container.querySelectorAll<HTMLElement>('.expandCollapse'));
+    expect(toggles.length).toBeGreaterThan(0);
+    toggles.forEach((toggle) => {
+      expect(toggle).toBeDisabled();
+      expect(toggle).toHaveAttribute('aria-hidden', 'true');
+      expect(toggle.style.visibility).toBe('hidden');
+      expect(toggle.querySelector('svg')).toBeNull();
+    });
     expect(container.querySelector('.controls')).toBeNull();
     expect(container.querySelector('[data-all-expanded]')).not.toBeNull();
   });
