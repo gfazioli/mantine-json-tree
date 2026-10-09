@@ -42,6 +42,11 @@ export interface JSONTreeNodeData extends TreeNodeData {
      * It is not a value of the data: it stands for the entries left out.
      */
     more?: JsonTreeMoreRow;
+    /**
+     * Set on the synthetic row that holds the key input while a key is being
+     * added to an object (`structuralEdits` with `'add'`).
+     */
+    draft?: { container: string };
   };
 }
 
@@ -781,4 +786,155 @@ export function findNodeByPath(
     }
   }
   return null;
+}
+
+/** Suffix of the "new key" row's tree value; NUL keeps it apart from every real path */
+export const DRAFT_ROW_SUFFIX = '\u0000new';
+
+/** Close the container whose tree value is `container` with a "new key" row. */
+export function appendDraftRow(nodes: JSONTreeNodeData[], container: string): JSONTreeNodeData[] {
+  return nodes.map((node) => {
+    const children = node.children as JSONTreeNodeData[] | undefined;
+    if (node.value === container) {
+      const nd = node.nodeData;
+      const draft: JSONTreeNodeData = {
+        value: `${container}${DRAFT_ROW_SUFFIX}`,
+        label: '',
+        nodeData: {
+          type: 'string',
+          value: '',
+          path: nd?.path ?? container,
+          depth: (nd?.depth ?? 0) + 1,
+          draft: { container },
+        },
+      };
+      return { ...node, children: [...(children ?? []), draft] };
+    }
+    return children ? { ...node, children: appendDraftRow(children, container) } : node;
+  });
+}
+
+/**
+ * The entries of a container as the tree lists them, groups flattened: a
+ * grouped array's items sit under `[start…end]` nodes but keep the array's
+ * path.
+ */
+export function getContainerEntries(node: JSONTreeNodeData): JSONTreeNodeData[] {
+  const children = (node.children ?? []) as JSONTreeNodeData[];
+  return children.flatMap((child) =>
+    child.nodeData?.chunk ? ((child.children ?? []) as JSONTreeNodeData[]) : [child]
+  );
+}
+
+/**
+ * Where tree values go after a structural edit. `moves` maps each value that
+ * changes to its new value (`null` when its node is gone); `keep` lists the
+ * moved values that another, unmoved node shares and so must keep.
+ */
+export interface TreeRemap {
+  moves: Map<string, string | null>;
+  keep: Set<string>;
+}
+
+/**
+ * Where every tree value under one container goes after a structural edit:
+ * `mapKey` gives the new key of each entry (`null` when it was removed), and
+ * the change carries down to everything below it. Only values that change are
+ * listed. The walk follows the tree rather than matching path prefixes, so a
+ * key holding a dot is never mistaken for a nested one — and since
+ * `{ 'a.b': … }` and `{ a: { b: … } }` share the tree value `root.a.b`, a value
+ * an unmoved node still holds is kept for it.
+ */
+export function remapContainerEntries(
+  nodes: JSONTreeNodeData[],
+  container: string,
+  mapKey: (key: string) => string | null
+): TreeRemap {
+  const moves = new Map<string, string | null>();
+  const keep = new Set<string>();
+  const node = findNodeByPath(nodes, container);
+  if (!node) {
+    return { moves, keep };
+  }
+
+  const moved = new Set<JSONTreeNodeData>();
+  const walk = (current: JSONTreeNodeData, from: string, to: string | null) => {
+    moved.add(current);
+    moves.set(current.value, to === null ? null : to + current.value.slice(from.length));
+    ((current.children ?? []) as JSONTreeNodeData[]).forEach((child) => walk(child, from, to));
+  };
+
+  for (const entry of getContainerEntries(node)) {
+    const key = entry.nodeData?.key;
+    if (key === undefined) {
+      continue;
+    }
+    const mapped = mapKey(key);
+    const next = mapped === null ? null : `${container}.${mapped}`;
+    if (next !== entry.value) {
+      walk(entry, entry.value, next);
+    }
+  }
+
+  const findShared = (list: JSONTreeNodeData[]) => {
+    for (const current of list) {
+      if (!moved.has(current) && moves.has(current.value)) {
+        keep.add(current.value);
+      }
+      findShared((current.children ?? []) as JSONTreeNodeData[]);
+    }
+  };
+  if (moves.size > 0) {
+    findShared(nodes);
+  }
+  return { moves, keep };
+}
+
+/** Re-key a record of tree values (an expanded state, say) through a remap. */
+export function applyRemap<T>(state: Record<string, T>, { moves, keep }: TreeRemap) {
+  const next: Record<string, T> = {};
+  for (const [key, value] of Object.entries(state)) {
+    if (!moves.has(key) || keep.has(key)) {
+      next[key] = value;
+    }
+  }
+  for (const [key, value] of Object.entries(state)) {
+    const mapped = moves.get(key);
+    if (mapped) {
+      next[mapped] = value;
+    }
+  }
+  return next;
+}
+
+/**
+ * The value a new key or item starts with: the type of the container's last
+ * entry, emptied — so a list of numbers grows by a number and a list of
+ * objects by an object. An empty container, or a last entry of a type that
+ * cannot be emptied (a Date, a Map, …), starts with an empty string.
+ */
+export function getDefaultNewValue(container: unknown): unknown {
+  const entries = Array.isArray(container)
+    ? container
+    : typeof container === 'object' && container !== null
+      ? Object.values(container)
+      : [];
+  if (entries.length === 0) {
+    return '';
+  }
+  const last = entries[entries.length - 1];
+  switch (getValueType(last)) {
+    case 'number':
+      return 0;
+    case 'boolean':
+      return false;
+    case 'null':
+      return null;
+    case 'array':
+      return [];
+    case 'object':
+      return isWritableContainer(last) ? {} : '';
+    default:
+      return '';
+  }
 }

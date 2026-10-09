@@ -1,4 +1,11 @@
-import { getValueAtPath, setValueAtPath } from './path';
+import {
+  getValueAtPath,
+  insertAtPath,
+  moveAtPath,
+  removeAtPath,
+  renameKeyAtPath,
+  setValueAtPath,
+} from './path';
 
 describe('setValueAtPath', () => {
   it('replaces the root when there are no segments', () => {
@@ -124,5 +131,106 @@ describe('getValueAtPath', () => {
   it('returns undefined for an address that does not resolve', () => {
     expect(getValueAtPath({ a: 1 }, ['a', 'b'])).toBeUndefined();
     expect(getValueAtPath({ a: 1 }, ['nope'])).toBeUndefined();
+  });
+});
+
+describe('structural edits', () => {
+  const when = new Date(0);
+  const original = {
+    user: { first: 'Ada', last: 'Lovelace', born: when },
+    list: ['a', 'b', 'c', 'd'],
+    other: { untouched: true },
+  };
+
+  describe('renameKeyAtPath', () => {
+    it('renames a key in place, keeping the key order and every other reference', () => {
+      const next = renameKeyAtPath(original, ['user', 'first'], 'given');
+      expect(Object.keys(next.user)).toEqual(['given', 'last', 'born']);
+      expect((next.user as any).given).toBe('Ada');
+      expect(next.user.born).toBe(when);
+      expect(next.other).toBe(original.other);
+      expect(original.user.first).toBe('Ada');
+    });
+
+    it('renames a top-level key', () => {
+      expect(Object.keys(renameKeyAtPath({ a: 1, b: 2 }, ['a'], 'z'))).toEqual(['z', 'b']);
+    });
+
+    it('refuses a key that already exists, an index and a missing key', () => {
+      expect(() => renameKeyAtPath(original, ['user', 'first'], 'last')).toThrow('already exists');
+      expect(() => renameKeyAtPath(original, ['list', 0], 'x')).toThrow('only an object key');
+      expect(() => renameKeyAtPath(original, ['user', 'nope'], 'x')).toThrow('does not exist');
+      expect(() => renameKeyAtPath(original, [], 'x')).toThrow('root');
+    });
+
+    it('accepts renaming a key to itself', () => {
+      expect(renameKeyAtPath({ a: 1 }, ['a'], 'a')).toEqual({ a: 1 });
+    });
+
+    it('stores a __proto__ key as data, never as the prototype', () => {
+      const next = renameKeyAtPath({ a: 1 } as Record<string, unknown>, ['a'], '__proto__');
+      expect(Object.getPrototypeOf(next)).toBe(Object.prototype);
+      expect(Object.hasOwn(next, '__proto__')).toBe(true);
+    });
+  });
+
+  describe('removeAtPath', () => {
+    it('removes a key', () => {
+      const next = removeAtPath(original, ['user', 'last']);
+      expect(next.user).toEqual({ first: 'Ada', born: when });
+      expect(original.user.last).toBe('Lovelace');
+    });
+
+    it('removes an array item and shifts the rest up', () => {
+      expect(removeAtPath(original, ['list', 1]).list).toEqual(['a', 'c', 'd']);
+    });
+
+    it('refuses an address that does not resolve', () => {
+      expect(() => removeAtPath(original, ['list', 9])).toThrow('out of range');
+      expect(() => removeAtPath(original, ['user', 'nope'])).toThrow('does not exist');
+      expect(() => removeAtPath(original, ['user', 'born', 'x'])).toThrow('not a plain object');
+    });
+  });
+
+  describe('insertAtPath', () => {
+    it('adds a key at the end of an object', () => {
+      const next = insertAtPath(original, ['user'], 'title', 'Countess');
+      expect(Object.keys(next.user)).toEqual(['first', 'last', 'born', 'title']);
+    });
+
+    it('appends to an array, or inserts at an index', () => {
+      expect(insertAtPath(original, ['list'], undefined, 'e').list).toEqual([
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+      ]);
+      expect(insertAtPath(original, ['list'], 0, 'z').list[0]).toBe('z');
+    });
+
+    it('adds to the root', () => {
+      expect(insertAtPath([1], [], undefined, 2)).toEqual([1, 2]);
+      expect(insertAtPath({}, [], 'a', 1)).toEqual({ a: 1 });
+    });
+
+    it('refuses an existing key, a missing key and a non-container', () => {
+      expect(() => insertAtPath(original, ['user'], 'first', 'x')).toThrow('already exists');
+      expect(() => insertAtPath(original, ['user'], undefined, 'x')).toThrow('a key is needed');
+      expect(() => insertAtPath(original, ['user', 'born'], 'x', 1)).toThrow('not a plain object');
+    });
+  });
+
+  describe('moveAtPath', () => {
+    it('moves an item down and up', () => {
+      expect(moveAtPath(original, ['list', 0], 2).list).toEqual(['b', 'c', 'a', 'd']);
+      expect(moveAtPath(original, ['list', 3], 0).list).toEqual(['d', 'a', 'b', 'c']);
+      expect(original.list).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('refuses an object key and an index out of range', () => {
+      expect(() => moveAtPath(original, ['user', 'first'], 0)).toThrow('only an array item');
+      expect(() => moveAtPath(original, ['list', 0], 4)).toThrow('cannot move');
+    });
   });
 });

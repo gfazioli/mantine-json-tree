@@ -31,31 +31,52 @@ import {
   type StyleProp,
   type TooltipProps,
 } from '@mantine/core';
-import { useDebouncedValue } from '@mantine/hooks';
+import { useDebouncedValue, useMergedRef } from '@mantine/hooks';
 import {
   IconArrowBarToDown,
   IconArrowBarToUp,
+  IconArrowDown,
+  IconArrowUp,
   IconCheck,
   IconChevronRight,
   IconCopy,
+  IconPlus,
   IconSearch,
+  IconTrash,
 } from '@tabler/icons-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { JsonTreeMediaVariables } from './JsonTreeMediaVariables';
 import { JsonTreeValueEditor, type JsonTreeEditorProps } from './JsonTreeValueEditor';
-import { setValueAtPath, type JsonTreePathSegments } from './lib/path';
 import {
+  getValueAtPath,
+  insertAtPath,
+  isWritableContainer,
+  moveAtPath,
+  removeAtPath,
+  renameKeyAtPath,
+  setValueAtPath,
+  type JsonTreePathSegments,
+} from './lib/path';
+import {
+  appendDraftRow,
+  applyRemap,
   convertToTreeData,
   filterTreeBySearch,
   findNodeByPath,
   formatKey,
   formatValue,
+  getArrayGroupSize,
+  getContainerEntries,
+  getDefaultNewValue,
   getItemCount,
   getTypeLabel,
+  getValueType,
   isExpandable,
   limitTreeEntries,
   MORE_ROW_SUFFIX,
+  remapContainerEntries,
   searchTree,
+  type TreeRemap,
   stringifyValue,
   type JsonTreeMoreRow,
   type JSONTreeNodeData,
@@ -88,7 +109,11 @@ export type JsonTreeStylesNames =
   | 'valueEditor'
   | 'typeBadge'
   | 'showMore'
-  | 'moreItems';
+  | 'moreItems'
+  | 'keyEditor'
+  | 'addButton'
+  | 'removeButton'
+  | 'moveButton';
 
 export type JsonTreeCssVariables = {
   root:
@@ -142,6 +167,10 @@ export type JsonTreeCssVariables = {
   typeBadge: never;
   showMore: never;
   moreItems: never;
+  keyEditor: never;
+  addButton: never;
+  removeButton: never;
+  moveButton: never;
 };
 
 export interface JsonTreeBaseProps {
@@ -376,6 +405,35 @@ export interface JsonTreeBaseProps {
 
   /** Props forwarded to the inline editor input */
   editorProps?: JsonTreeEditorProps;
+
+  /**
+   * Structural edits allowed on top of value edits while `editable` is on:
+   * `'rename'` an object key, `'add'` a key or an item, `'remove'` one, and
+   * `'reorder'` the items of an array. `true` allows all four.
+   *
+   * Click a key to rename it, or press F2 on its row; Delete or Backspace
+   * removes the focused row, Insert or `+` adds to it, and Alt + ↑ / ↓ moves an
+   * array item. Each row also gets its own buttons. Expanded nodes, revealed
+   * pages and focus follow every change, so the tree never jumps under the
+   * reader's hands.
+   *
+   * @default false
+   */
+  structuralEdits?: boolean | JsonTreeStructuralEdit[];
+
+  /**
+   * The value a new key or item starts with. By default it copies the type of
+   * the container's last entry, emptied (`''`, `0`, `false`, `null`, `{}`, `[]`),
+   * and starts as an empty string otherwise. A new string or number opens its
+   * editor straight away.
+   */
+  getNewValue?: (container: JsonTreeNodePayload) => unknown;
+
+  /**
+   * Return an error message to reject a key typed to rename or add, or `null`
+   * to accept it. A key that already exists on the object is always rejected.
+   */
+  validateKey?: (key: string, container: JsonTreeNodePayload) => string | null;
 }
 
 /** Display mode for functions in JSON data */
@@ -383,6 +441,14 @@ export type JsonTreeFunctionDisplay = 'as-string' | 'hide' | 'as-object';
 
 /** Value types that in-place editing can handle */
 export type JsonTreeEditableType = 'string' | 'number' | 'boolean';
+
+/** Structural edits `structuralEdits` can allow on top of value edits */
+export type JsonTreeStructuralEdit = 'rename' | 'add' | 'remove' | 'reorder';
+
+/** What a change did: `edit` changed a value, the others come from `structuralEdits` */
+export type JsonTreeChangeAction = 'edit' | JsonTreeStructuralEdit;
+
+const ALL_STRUCTURAL_EDITS: JsonTreeStructuralEdit[] = ['rename', 'add', 'remove', 'reorder'];
 
 /** Everything known about the node an editing callback is being asked about */
 export interface JsonTreeNodePayload {
@@ -415,10 +481,22 @@ export interface JsonTreeHighlightPayload {
   value: unknown;
 }
 
-/** Describes a committed edit */
+/**
+ * Describes a committed change. `path`, `pathSegments`, `key`, `type` and
+ * `value` describe the node as it is after the change; for a `remove`, the node
+ * that was removed, with `value` undefined.
+ */
 export interface JsonTreeChange extends JsonTreeNodePayload {
-  /** The value the node held before the edit */
+  /** What happened: `edit` for a value, or a structural edit */
+  action: JsonTreeChangeAction;
+  /** The value the node held before the change, `undefined` for an `add` */
   previousValue: unknown;
+  /** Where a renamed or reordered node was before */
+  previousPath?: string;
+  /** The address a renamed or reordered node had before */
+  previousPathSegments?: JsonTreePathSegments;
+  /** The key a renamed or reordered node had before (an index, for an array item) */
+  previousKey?: string;
 }
 
 export interface JsonTreeProps
@@ -531,7 +609,20 @@ interface RenderNodeContext {
   /** `allExpanded`: every node is open and none can be collapsed */
   locked?: boolean;
   /** Reveal the next page of a container cut by `maxDisplayLength` */
-  onRevealMore?: (more: JsonTreeMoreRow, scope: HTMLElement | null) => void;
+  onRevealMore?: (more: JsonTreeMoreRow) => void;
+  /** Serialized segments of the node whose key is being renamed, if any */
+  renamingKey?: string | null;
+  canEditStructure?: (node: JSONTreeNodeData, action: JsonTreeStructuralEdit) => boolean;
+  getParentLength?: (node: JSONTreeNodeData) => number;
+  onStartRename?: (key: string, row: HTMLElement | null) => void;
+  validateRename?: (node: JSONTreeNodeData, key: string) => string | null;
+  onRename?: (node: JSONTreeNodeData, key: string) => void;
+  onCancelStructure?: () => void;
+  onStartAdd?: (node: JSONTreeNodeData, row: HTMLElement | null) => void;
+  validateNewKey?: (container: string, key: string) => string | null;
+  onAddKey?: (container: string, key: string) => void;
+  onRemove?: (node: JSONTreeNodeData) => void;
+  onMove?: (node: JSONTreeNodeData, direction: -1 | 1) => void;
   searchQuery?: string;
   matchedPaths?: Set<string>;
   directMatches?: Set<string>;
@@ -777,7 +868,7 @@ function renderJSONNode(
           data-json-tree-more
           onClick={(event: React.MouseEvent<HTMLElement>) => {
             event.stopPropagation();
-            ctx.onRevealMore?.(more, event.currentTarget.closest<HTMLElement>('[data-tree-root]'));
+            ctx.onRevealMore?.(more);
           }}
         >
           … {more.hidden} more {more.unit}
@@ -785,6 +876,171 @@ function renderJSONNode(
       </Group>
     );
   }
+
+  // The row holding the key input while a key is added to an object
+  const draft = jsonNode.nodeData?.draft;
+  if (draft) {
+    return (
+      <Group
+        gap={4}
+        wrap="nowrap"
+        {...elementProps}
+        onClick={undefined}
+        style={{ position: 'relative' }}
+      >
+        {lineNumber}
+        {renderIndentGuides()}
+        <Box {...getStyles('keyEditor')}>
+          <JsonTreeValueEditor
+            value=""
+            type="string"
+            editorProps={{
+              ...ctx.editorProps,
+              'aria-label': ctx.editorProps?.['aria-label'] ?? 'New key',
+            }}
+            validate={(next) => ctx.validateNewKey?.(draft.container, String(next)) ?? null}
+            onCommit={(next) => ctx.onAddKey?.(draft.container, String(next))}
+            onCancel={() => ctx.onCancelStructure?.()}
+          />
+        </Box>
+      </Group>
+    );
+  }
+
+  // Segments, not the display path: two different nodes can share a path
+  // string, and editing must never be ambiguous about which one it means.
+  const editKey = pathSegments ? JSON.stringify(pathSegments) : null;
+  const canRename = editKey !== null && (ctx.canEditStructure?.(jsonNode, 'rename') ?? false);
+
+  const keyCell =
+    displayKey === undefined ? null : canRename && ctx.renamingKey === editKey ? (
+      <>
+        <Box {...getStyles('keyEditor')}>
+          <JsonTreeValueEditor
+            value={key}
+            type="string"
+            editorProps={{
+              ...ctx.editorProps,
+              'aria-label': ctx.editorProps?.['aria-label'] ?? `Rename ${key}`,
+            }}
+            validate={(next) => ctx.validateRename?.(jsonNode, String(next)) ?? null}
+            onCommit={(next) => ctx.onRename?.(jsonNode, String(next))}
+            onCancel={() => ctx.onCancelStructure?.()}
+          />
+        </Box>
+        <Text component="span" {...getStyles('keyValueSeparator')}>
+          :
+        </Text>
+      </>
+    ) : (
+      <>
+        <Text
+          component="span"
+          {...getStyles('key')}
+          data-key={hasChildren ? undefined : key}
+          data-renamable={canRename || undefined}
+          onClick={
+            canRename
+              ? (event: React.MouseEvent<HTMLElement>) => {
+                  // the row's own click toggles the node or calls onNodeClick
+                  event.stopPropagation();
+                  ctx.onStartRename?.(
+                    editKey,
+                    event.currentTarget.closest<HTMLElement>('[role="treeitem"]')
+                  );
+                }
+              : undefined
+          }
+        >
+          {ctx.searchQuery ? highlightText(displayKey, ctx.searchQuery, getStyles) : displayKey}
+        </Text>
+        <Text component="span" {...getStyles('keyValueSeparator')}>
+          :
+        </Text>
+      </>
+    );
+
+  // Add, move and remove, for the rows `structuralEdits` allows them on
+  const editActions = (() => {
+    const can = (action: JsonTreeStructuralEdit) =>
+      ctx.canEditStructure?.(jsonNode, action) ?? false;
+    const canAdd = can('add');
+    const canReorder = can('reorder');
+    const canRemove = can('remove');
+    if (!canAdd && !canReorder && !canRemove) {
+      return null;
+    }
+    const index = canReorder ? Number(pathSegments![pathSegments!.length - 1]) : 0;
+    const length = canReorder ? (ctx.getParentLength?.(jsonNode) ?? 0) : 0;
+    const act = (run: () => void) => (event: React.MouseEvent) => {
+      event.stopPropagation();
+      run();
+    };
+    return (
+      <>
+        {canAdd && (
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            color="gray"
+            aria-label={type === 'array' ? 'Add item' : 'Add key'}
+            data-json-tree-action="add"
+            {...getStyles('addButton')}
+            onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+              event.stopPropagation();
+              ctx.onStartAdd?.(
+                jsonNode,
+                event.currentTarget.closest<HTMLElement>('[role="treeitem"]')
+              );
+            }}
+          >
+            <IconPlus size={12} />
+          </ActionIcon>
+        )}
+        {canReorder && (
+          <>
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color="gray"
+              aria-label="Move up"
+              data-json-tree-action="move-up"
+              disabled={index <= 0}
+              {...getStyles('moveButton')}
+              onClick={act(() => ctx.onMove?.(jsonNode, -1))}
+            >
+              <IconArrowUp size={12} />
+            </ActionIcon>
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color="gray"
+              aria-label="Move down"
+              data-json-tree-action="move-down"
+              disabled={index >= length - 1}
+              {...getStyles('moveButton')}
+              onClick={act(() => ctx.onMove?.(jsonNode, 1))}
+            >
+              <IconArrowDown size={12} />
+            </ActionIcon>
+          </>
+        )}
+        {canRemove && (
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            color="red"
+            aria-label="Remove"
+            data-json-tree-action="remove"
+            {...getStyles('removeButton')}
+            onClick={act(() => ctx.onRemove?.(jsonNode))}
+          >
+            <IconTrash size={12} />
+          </ActionIcon>
+        )}
+      </>
+    );
+  })();
 
   // Render primitive value
   if (!hasChildren) {
@@ -806,21 +1062,9 @@ function renderJSONNode(
       >
         {lineNumber}
         {renderIndentGuides()}
-        {displayKey !== undefined && (
-          <>
-            <Text component="span" {...getStyles('key')} data-key={key}>
-              {ctx.searchQuery ? highlightText(displayKey, ctx.searchQuery, getStyles) : displayKey}
-            </Text>
-            <Text component="span" {...getStyles('keyValueSeparator')}>
-              :
-            </Text>
-          </>
-        )}
+        {keyCell}
         {(() => {
           const formattedValue = formatValue(value, type, withQuotes);
-          // Segments, not the display path: two different nodes can share a path
-          // string, and editing must never be ambiguous about which one it means.
-          const editKey = pathSegments ? JSON.stringify(pathSegments) : null;
           const isEditable = editKey !== null && (ctx.isNodeEditable?.(jsonNode) ?? false);
 
           if (isEditable && ctx.editingKey === editKey) {
@@ -901,6 +1145,8 @@ function renderJSONNode(
         {withCopyToClipboard && (
           <CopyNodeButton icon={copyToClipboardIcon} getStyles={getStyles} onCopy={handleCopy} />
         )}
+
+        {editActions}
       </Group>
     );
   }
@@ -970,16 +1216,7 @@ function renderJSONNode(
         </ActionIcon>
       )}
 
-      {displayKey !== undefined && (
-        <>
-          <Text component="span" {...getStyles('key')}>
-            {ctx.searchQuery ? highlightText(displayKey, ctx.searchQuery, getStyles) : displayKey}
-          </Text>
-          <Text component="span" {...getStyles('keyValueSeparator')}>
-            :
-          </Text>
-        </>
-      )}
+      {keyCell}
 
       <Text component="span" {...getStyles('bracket')}>
         {openBracket}
@@ -1014,6 +1251,8 @@ function renderJSONNode(
           {copyToClipboardIcon}
         </ActionIcon>
       )}
+
+      {editActions}
     </Group>
   );
 }
@@ -1086,6 +1325,10 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       typeBadge: {},
       showMore: {},
       moreItems: {},
+      keyEditor: {},
+      addButton: {},
+      removeButton: {},
+      moveButton: {},
     };
   }
 );
@@ -1143,6 +1386,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     isEditable,
     validate,
     editorProps,
+    structuralEdits,
+    getNewValue,
+    validateKey,
     sortKeys,
     groupArraysAfterLength,
     collapseStringsAfterLength: _collapseStringsAfterLength,
@@ -1158,6 +1404,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     unstyled,
     vars,
     className,
+    ref,
 
     ...others
   } = props;
@@ -1176,6 +1423,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   });
 
   const responsiveClassName = useRandomClassName();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const mergedRef = useMergedRef(ref, rootRef);
 
   // A locked tree never reports an expansion change: nothing can change
   const onExpandedChange = allExpanded ? undefined : _onExpandedChange;
@@ -1234,27 +1483,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
   }, [allExpanded, controlledExpanded]);
 
-  // Every node open, array groups included. The controller handed to the Tree
-  // ignores expand and collapse, which is what keeps the keyboard (ArrowLeft,
-  // Space) from closing anything.
-  const lockedExpandedState = useMemo(
-    () => (allExpanded ? getTreeExpandedState(treeData, '*') : null),
-    [allExpanded, treeData]
-  );
-  const noop = () => {};
-  const treeController = lockedExpandedState
-    ? {
-        ...tree,
-        expandedState: lockedExpandedState,
-        expand: noop,
-        collapse: noop,
-        toggleExpanded: noop,
-        expandAllNodes: noop,
-        collapseAllNodes: noop,
-        setExpandedState: noop,
-      }
-    : tree;
-
   // Sync controlled expanded state
   useEffect(() => {
     if (controlledExpanded) {
@@ -1267,29 +1495,66 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tree.setExpandedState changes on every render; using tree would cause infinite loop
   }, [controlledExpanded]);
 
+  // How many entries `maxDisplayLength` shows of each container a reader asked to see more of
+  const [revealed, setRevealed] = useState<Record<string, number>>({});
+  const displayLimit =
+    typeof maxDisplayLength === 'number' && Number.isFinite(maxDisplayLength)
+      ? Math.max(1, Math.floor(maxDisplayLength))
+      : 0;
+
+  /** Focus the first of these rows (tree values) that is rendered */
+  const focusRow = useCallback((paths: string[]) => {
+    const rows = Array.from(
+      rootRef.current?.querySelectorAll<HTMLElement>('li[role="treeitem"]') ?? []
+    );
+    for (const path of paths) {
+      const row = rows.find((li) => li.getAttribute('data-value') === path);
+      if (row) {
+        row.setAttribute('data-focus-ring', 'true');
+        row.focus();
+        return;
+      }
+    }
+  }, []);
+
+  // Rows to focus once the tree has re-rendered: the first entry a "more" row
+  // revealed, the row that took the place of a removed one, a moved item…
+  // Without it focus falls to the body when the row it was on goes away.
+  const [pendingFocus, setPendingFocus] = useState<string[] | null>(null);
+
   // Editing state. Only the address of the node being edited lives here — the
   // draft value stays inside the editor, so typing never re-renders the tree.
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  // The row that owns the open editor. When the editor unmounts its input goes
-  // with it and focus falls to the body, which drops a keyboard user out of the
-  // tree entirely — arrow navigation stops working until they tab back in.
-  const editingRowRef = useRef<HTMLElement | null>(null);
+  // Serialized segments of the node whose key is being renamed
+  const [renamingKey, setRenamingKey] = useState<string | null>(null);
+  // Tree value of the object a key is being added to
+  const [addingTo, setAddingTo] = useState<string | null>(null);
+  // The row that owns the open editor, or the tree value of a row that does not
+  // exist yet (a key just added). When the editor unmounts its input goes with
+  // it and focus falls to the body, which drops a keyboard user out of the tree
+  // entirely — arrow navigation stops working until they tab back in.
+  const editingRowRef = useRef<HTMLElement | string | null>(null);
 
   const handleStartEdit = useCallback((key: string, row: HTMLElement | null) => {
     editingRowRef.current = row;
+    setRenamingKey(null);
+    setAddingTo(null);
     setEditingKey(key);
   }, []);
 
+  const editorOpen = editingKey !== null || renamingKey !== null || addingTo !== null;
   useEffect(() => {
-    if (editingKey !== null) {
+    if (editorOpen) {
       return;
     }
     const row = editingRowRef.current;
     editingRowRef.current = null;
-    if (row?.isConnected) {
+    if (typeof row === 'string') {
+      focusRow([row]);
+    } else if (row?.isConnected) {
       row.focus();
     }
-  }, [editingKey]);
+  }, [editorOpen, focusRow]);
 
   const nodePayload = useCallback((node: JSONTreeNodeData): JsonTreeNodePayload | null => {
     const nd = node.nodeData;
@@ -1345,12 +1610,380 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       }
 
       const nextData = setValueAtPath(data, payload.pathSegments, nextValue);
-      onChange?.(nextData, { ...payload, value: nextValue, previousValue: payload.value });
+      onChange?.(nextData, {
+        ...payload,
+        action: 'edit',
+        value: nextValue,
+        previousValue: payload.value,
+      });
     },
     [data, onChange, nodePayload]
   );
 
   const handleCancelEdit = useCallback(() => setEditingKey(null), []);
+
+  // ---- Structural edits: rename, add, remove, reorder ----------------------
+
+  const allowedStructuralEdits = useMemo(
+    () =>
+      new Set<JsonTreeStructuralEdit>(
+        editable && structuralEdits
+          ? structuralEdits === true
+            ? ALL_STRUCTURAL_EDITS
+            : structuralEdits
+          : []
+      ),
+    [editable, structuralEdits]
+  );
+
+  const canEditStructure = (node: JSONTreeNodeData, action: JsonTreeStructuralEdit) => {
+    if (!allowedStructuralEdits.has(action)) {
+      return false;
+    }
+    const payload = nodePayload(node);
+    if (!payload || payload.type === 'circular') {
+      // groups, "more" rows, Map and Set entries and a reference cycle have no
+      // address a structural edit could be written to
+      return false;
+    }
+    const segments = payload.pathSegments;
+    const last = segments[segments.length - 1];
+    if (action === 'add' && !isWritableContainer(payload.value)) {
+      return false;
+    }
+    if (action === 'rename' && typeof last !== 'string') {
+      return false;
+    }
+    if (action === 'reorder' && typeof last !== 'number') {
+      return false;
+    }
+    if (action === 'remove' && segments.length === 0) {
+      return false;
+    }
+    return isEditable?.(payload) ?? true;
+  };
+
+  /** The tree value of the container holding `node` */
+  const parentTreeValue = (node: JSONTreeNodeData) => {
+    const key = node.nodeData?.key ?? '';
+    return node.value.slice(0, node.value.length - key.length - 1);
+  };
+
+  const getParentLength = (node: JSONTreeNodeData) => {
+    const segments = node.nodeData?.pathSegments;
+    const parent = segments ? getValueAtPath(data, segments.slice(0, -1)) : undefined;
+    return Array.isArray(parent) ? parent.length : 0;
+  };
+
+  /**
+   * Where the `[start…end]` groups of a grouped array go once its length
+   * changes: the last group's label moves with the length, and groups appear or
+   * vanish when the array crosses `groupArraysAfterLength`.
+   */
+  const groupValue = (container: string, index: number, length: number) => {
+    const size = getArrayGroupSize(length, groupArraysAfterLength);
+    if (!size) {
+      return null;
+    }
+    const start = Math.floor(index / size) * size;
+    return `${container}.[${start}…${Math.min(start + size, length) - 1}]`;
+  };
+  const remapGroups = (container: JSONTreeNodeData, nextLength: number, remap: TreeRemap) => {
+    for (const child of (container.children ?? []) as JSONTreeNodeData[]) {
+      const chunk = child.nodeData?.chunk;
+      if (chunk) {
+        const next =
+          chunk.start < nextLength ? groupValue(container.value, chunk.start, nextLength) : null;
+        if (next !== child.value) {
+          remap.moves.set(child.value, next);
+        }
+      }
+    }
+  };
+
+  /**
+   * Report a structural change, and carry the tree's own state across it:
+   * expanded nodes and revealed pages are keyed by tree value, and a rename or
+   * a shifted index changes the values of everything below it.
+   */
+  const commitStructuralChange = (
+    nextData: unknown,
+    change: JsonTreeChange,
+    {
+      remap,
+      expand = [],
+      reveal,
+      focus,
+    }: {
+      remap?: TreeRemap;
+      expand?: (string | null)[];
+      reveal?: { container: string; count: number };
+      focus?: string[];
+    }
+  ) => {
+    const toExpand = expand.filter((value): value is string => value !== null);
+    if (!allExpanded && (remap?.moves.size || toExpand.length)) {
+      const next = remap ? applyRemap(tree.expandedState, remap) : { ...tree.expandedState };
+      toExpand.forEach((value) => {
+        next[value] = true;
+      });
+      if (onExpandedChange) {
+        onExpandedChange(Object.keys(next).filter((key) => next[key]));
+      } else {
+        tree.setExpandedState(next);
+      }
+    }
+    if (remap?.moves.size || reveal) {
+      setRevealed((current) => {
+        const next = remap ? applyRemap(current, remap) : { ...current };
+        if (reveal && displayLimit && reveal.count > (next[reveal.container] ?? displayLimit)) {
+          next[reveal.container] = reveal.count;
+        }
+        return next;
+      });
+    }
+    onChange?.(nextData, change);
+    if (focus) {
+      setPendingFocus(focus);
+    }
+  };
+
+  /** Open the value editor on a node that was just added, or focus it */
+  const editOrFocusNew = (treeValue: string, payload: JsonTreeNodePayload) => {
+    const opensEditor =
+      (payload.type === 'string' || payload.type === 'number') &&
+      (editableTypes ?? []).includes(payload.type) &&
+      (isEditable?.(payload) ?? true);
+    if (opensEditor) {
+      editingRowRef.current = treeValue;
+      setEditingKey(JSON.stringify(payload.pathSegments));
+    } else {
+      setPendingFocus([treeValue]);
+    }
+  };
+
+  const containerPayload = (container: string) => {
+    const node = findNodeByPath(treeData, container);
+    return node ? nodePayload(node) : null;
+  };
+
+  const handleStartRename = (key: string, row: HTMLElement | null) => {
+    editingRowRef.current = row;
+    setEditingKey(null);
+    setAddingTo(null);
+    setRenamingKey(key);
+  };
+
+  const validateRename = (node: JSONTreeNodeData, nextKey: string) => {
+    const key = node.nodeData?.key;
+    const parent = containerPayload(parentTreeValue(node));
+    if (!parent) {
+      return null;
+    }
+    if (nextKey !== key && Object.hasOwn(parent.value as object, nextKey)) {
+      return 'Key already exists';
+    }
+    return validateKey?.(nextKey, parent) ?? null;
+  };
+
+  const handleRename = (node: JSONTreeNodeData, nextKey: string) => {
+    setRenamingKey(null);
+    const payload = nodePayload(node);
+    const key = node.nodeData?.key;
+    if (!payload || key === undefined || nextKey === key) {
+      return;
+    }
+    const parent = parentTreeValue(node);
+    const pathSegments = [...payload.pathSegments.slice(0, -1), nextKey];
+    commitStructuralChange(
+      renameKeyAtPath(data, payload.pathSegments, nextKey),
+      {
+        ...payload,
+        action: 'rename',
+        path: `${parent}.${nextKey}`,
+        pathSegments,
+        key: nextKey,
+        previousValue: payload.value,
+        previousPath: payload.path,
+        previousPathSegments: payload.pathSegments,
+        previousKey: key,
+      },
+      {
+        remap: remapContainerEntries(treeData, parent, (k) => (k === key ? nextKey : k)),
+        focus: [`${parent}.${nextKey}`],
+      }
+    );
+  };
+
+  const handleCancelStructure = () => {
+    setRenamingKey(null);
+    setAddingTo(null);
+  };
+
+  const newValueFor = (container: JsonTreeNodePayload) =>
+    getNewValue ? getNewValue(container) : getDefaultNewValue(container.value);
+
+  const handleStartAdd = (node: JSONTreeNodeData, row: HTMLElement | null) => {
+    const payload = nodePayload(node);
+    if (!payload || !isWritableContainer(payload.value)) {
+      return;
+    }
+    setEditingKey(null);
+    setRenamingKey(null);
+
+    if (!Array.isArray(payload.value)) {
+      // An object needs a key first: a "new key" row opens inside it
+      editingRowRef.current = row;
+      setAddingTo(node.value);
+      if (!allExpanded && !tree.expandedState[node.value]) {
+        const next = { ...tree.expandedState, [node.value]: true };
+        if (onExpandedChange) {
+          onExpandedChange(Object.keys(next).filter((key) => next[key]));
+        } else {
+          tree.setExpandedState(next);
+        }
+      }
+      return;
+    }
+
+    // An array grows by one item at its end
+    setAddingTo(null);
+    const value = newValueFor(payload);
+    const index = payload.value.length;
+    const added: JsonTreeNodePayload = {
+      path: `${payload.path}.${index}`,
+      pathSegments: [...payload.pathSegments, index],
+      key: String(index),
+      type: getValueType(value),
+      value,
+    };
+    const remap: TreeRemap = { moves: new Map(), keep: new Set() };
+    remapGroups(node, index + 1, remap);
+    commitStructuralChange(
+      insertAtPath(data, payload.pathSegments, undefined, value),
+      { ...added, action: 'add', previousValue: undefined },
+      {
+        remap,
+        expand: [node.value, groupValue(node.value, index, index + 1)],
+        reveal: { container: node.value, count: index + 1 },
+      }
+    );
+    editOrFocusNew(`${node.value}.${index}`, added);
+  };
+
+  const validateNewKey = (container: string, key: string) => {
+    const payload = containerPayload(container);
+    if (!payload) {
+      return null;
+    }
+    if (Object.hasOwn(payload.value as object, key)) {
+      return 'Key already exists';
+    }
+    return validateKey?.(key, payload) ?? null;
+  };
+
+  const handleAddKey = (container: string, key: string) => {
+    setAddingTo(null);
+    const payload = containerPayload(container);
+    if (!payload || Array.isArray(payload.value) || !isWritableContainer(payload.value)) {
+      return;
+    }
+    const value = newValueFor(payload);
+    const count = Object.keys(payload.value).length + 1;
+    const added: JsonTreeNodePayload = {
+      path: `${payload.path}.${key}`,
+      pathSegments: [...payload.pathSegments, key],
+      key,
+      type: getValueType(value),
+      value,
+    };
+    commitStructuralChange(
+      insertAtPath(data, payload.pathSegments, key, value),
+      { ...added, action: 'add', previousValue: undefined },
+      { expand: [container], reveal: { container, count } }
+    );
+    editOrFocusNew(`${container}.${key}`, added);
+  };
+
+  const handleRemove = (node: JSONTreeNodeData) => {
+    const payload = nodePayload(node);
+    const key = node.nodeData?.key;
+    if (!payload || key === undefined || payload.pathSegments.length === 0) {
+      return;
+    }
+    setEditingKey(null);
+    setRenamingKey(null);
+    setAddingTo(null);
+
+    const parent = parentTreeValue(node);
+    const parentNode = findNodeByPath(treeData, parent);
+    const last = payload.pathSegments[payload.pathSegments.length - 1];
+    const remap = remapContainerEntries(
+      treeData,
+      parent,
+      typeof last === 'number'
+        ? (k) => {
+            const index = Number(k);
+            return index === last ? null : index > last ? String(index - 1) : k;
+          }
+        : (k) => (k === key ? null : k)
+    );
+    if (typeof last === 'number' && parentNode) {
+      remapGroups(parentNode, getParentLength(node) - 1, remap);
+    }
+
+    // Focus moves to the entry that takes the removed one's place, else the
+    // one before it, else the container
+    const entries = parentNode ? getContainerEntries(parentNode) : [];
+    const at = entries.findIndex((entry) => entry.value === node.value);
+    const after = (entry: JSONTreeNodeData | undefined) =>
+      entry ? (remap.moves.has(entry.value) ? remap.moves.get(entry.value) : entry.value) : null;
+    const focus = [after(entries[at + 1]), after(entries[at - 1]), parent].filter(
+      (value): value is string => Boolean(value)
+    );
+
+    commitStructuralChange(
+      removeAtPath(data, payload.pathSegments),
+      { ...payload, action: 'remove', value: undefined, previousValue: payload.value },
+      { remap, focus }
+    );
+  };
+
+  const handleMove = (node: JSONTreeNodeData, direction: -1 | 1) => {
+    const payload = nodePayload(node);
+    const last = payload?.pathSegments[payload.pathSegments.length - 1];
+    if (!payload || typeof last !== 'number') {
+      return;
+    }
+    const to = last + direction;
+    const length = getParentLength(node);
+    if (to < 0 || to >= length) {
+      return;
+    }
+    const parent = parentTreeValue(node);
+    const pathSegments = [...payload.pathSegments.slice(0, -1), to];
+    commitStructuralChange(
+      moveAtPath(data, payload.pathSegments, to),
+      {
+        ...payload,
+        action: 'reorder',
+        path: `${parent}.${to}`,
+        pathSegments,
+        key: String(to),
+        previousValue: payload.value,
+        previousPath: payload.path,
+        previousPathSegments: payload.pathSegments,
+        previousKey: String(last),
+      },
+      {
+        remap: remapContainerEntries(treeData, parent, (k) =>
+          Number(k) === last ? String(to) : Number(k) === to ? String(last) : k
+        ),
+        expand: [groupValue(parent, to, length)],
+        focus: [`${parent}.${to}`],
+      }
+    );
+  };
 
   useEffect(() => {
     // The most likely way to get this wrong is to switch `editable` on and see
@@ -1382,6 +2015,30 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
             button.click();
             return;
           }
+        }
+      }
+
+      // Structural shortcuts act on the focused row by clicking its own control,
+      // so mouse and keyboard share one code path
+      const focusedRow = e.target as HTMLElement | null;
+      if (allowedStructuralEdits.size > 0 && focusedRow?.getAttribute?.('role') === 'treeitem') {
+        const selector =
+          e.key === 'F2'
+            ? '[data-renamable]'
+            : e.key === 'Delete' || e.key === 'Backspace'
+              ? '[data-json-tree-action="remove"]'
+              : e.key === 'Insert' || e.key === '+'
+                ? '[data-json-tree-action="add"]'
+                : null;
+        const control = selector
+          ? Array.from(focusedRow.querySelectorAll<HTMLElement>(selector)).find(
+              (el) => el.closest('[role="treeitem"]') === focusedRow
+            )
+          : undefined;
+        if (control) {
+          e.preventDefault();
+          control.click();
+          return;
         }
       }
 
@@ -1454,7 +2111,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         // Clipboard write may fail silently in unsupported contexts
       }
     },
-    [withCopyToClipboard, treeData, onCopy, editable]
+    [withCopyToClipboard, treeData, onCopy, editable, allowedStructuralEdits]
   );
 
   // Key count for badge
@@ -1475,13 +2132,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     [treeData, debouncedQuery, withQuotes, withKeyQuotes]
   );
 
-  // How many entries `maxDisplayLength` shows of each container a reader asked to see more of
-  const [revealed, setRevealed] = useState<Record<string, number>>({});
-  const displayLimit =
-    typeof maxDisplayLength === 'number' && Number.isFinite(maxDisplayLength)
-      ? Math.max(1, Math.floor(maxDisplayLength))
-      : 0;
-
   // Filtered tree data for search (hide non-matching nodes). While searching the
   // entry limit is off, so a match past the cut is never hidden behind a "more" row.
   const filteredTreeData = useMemo(() => {
@@ -1491,34 +2141,27 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     return filterTreeBySearch(treeData, searchResults.matchedPaths);
   }, [treeData, debouncedQuery, searchResults, displayLimit, revealed]);
 
-  // A row to focus once the tree has re-rendered: the first entry a "more" row
-  // revealed. Without it focus falls to the body when the row it was on goes away.
-  const [pendingFocus, setPendingFocus] = useState<{
-    path: string;
-    scope: HTMLElement | null;
-  } | null>(null);
+  // The rows on screen: the "new key" row joins the object a key is being added to
+  const displayedTreeData = useMemo(
+    () => (addingTo ? appendDraftRow(filteredTreeData, addingTo) : filteredTreeData),
+    [filteredTreeData, addingTo]
+  );
 
   useEffect(() => {
     if (!pendingFocus) {
       return;
     }
     setPendingFocus(null);
-    const target = Array.from(
-      pendingFocus.scope?.querySelectorAll<HTMLElement>('li[role="treeitem"]') ?? []
-    ).find((li) => li.getAttribute('data-value') === pendingFocus.path);
-    if (target) {
-      target.setAttribute('data-focus-ring', 'true');
-      target.focus();
-    }
-  }, [pendingFocus, filteredTreeData]);
+    focusRow(pendingFocus);
+  }, [pendingFocus, displayedTreeData, focusRow]);
 
   const handleRevealMore = useCallback(
-    (more: JsonTreeMoreRow, scope: HTMLElement | null) => {
+    (more: JsonTreeMoreRow) => {
       setRevealed((current) => ({
         ...current,
         [more.container]: (current[more.container] ?? displayLimit) + displayLimit,
       }));
-      setPendingFocus({ path: more.next, scope });
+      setPendingFocus([more.next]);
     },
     [displayLimit]
   );
@@ -1618,11 +2261,44 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     isNodeEditable,
     validateNode,
     editorProps,
+    renamingKey,
+    canEditStructure: allowedStructuralEdits.size > 0 ? canEditStructure : undefined,
+    getParentLength,
+    onStartRename: handleStartRename,
+    validateRename,
+    onRename: handleRename,
+    onCancelStructure: handleCancelStructure,
+    onStartAdd: handleStartAdd,
+    validateNewKey,
+    onAddKey: handleAddKey,
+    onRemove: handleRemove,
+    onMove: handleMove,
   };
+
+  // Every node open, array groups included. The controller handed to the Tree
+  // ignores expand and collapse, which is what keeps the keyboard (ArrowLeft,
+  // Space) from closing anything.
+  const lockedExpandedState = useMemo(
+    () => (allExpanded ? getTreeExpandedState(displayedTreeData, '*') : null),
+    [allExpanded, displayedTreeData]
+  );
+  const noop = () => {};
+  const treeController = lockedExpandedState
+    ? {
+        ...tree,
+        expandedState: lockedExpandedState,
+        expand: noop,
+        collapse: noop,
+        toggleExpanded: noop,
+        expandAllNodes: noop,
+        collapseAllNodes: noop,
+        setExpandedState: noop,
+      }
+    : tree;
 
   const treeComponent = (
     <Tree
-      data={filteredTreeData}
+      data={displayedTreeData}
       tree={treeController}
       levelOffset={32}
       renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
@@ -1632,13 +2308,35 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const showHeader =
     title || (withExpandAll && !allExpanded) || withKeyCountBadge || withCopyAll || withSearch;
 
-  // Mantine's Tree turns ArrowLeft on an open node into a collapse, which a
-  // locked tree ignores; move to the parent instead, as on a leaf.
-  const handleLockedKeyDownCapture = (event: React.KeyboardEvent) => {
-    if (!allExpanded || event.nativeEvent.code !== 'ArrowLeft') {
+  // Mantine's Tree handles the arrow keys on the row and stops them there, so
+  // the two that mean something else here are caught on the way down.
+  const handleKeyDownCapture = (event: React.KeyboardEvent) => {
+    const row = event.target as HTMLElement;
+    const { code } = event.nativeEvent;
+
+    // Alt + ↑ / ↓ moves an array item, through its own buttons
+    if (
+      event.altKey &&
+      (code === 'ArrowUp' || code === 'ArrowDown') &&
+      row.getAttribute?.('role') === 'treeitem'
+    ) {
+      const action = code === 'ArrowUp' ? 'move-up' : 'move-down';
+      const button = Array.from(
+        row.querySelectorAll<HTMLButtonElement>(`[data-json-tree-action="${action}"]`)
+      ).find((el) => el.closest('[role="treeitem"]') === row);
+      if (button) {
+        event.preventDefault();
+        event.stopPropagation();
+        button.click();
+        return;
+      }
+    }
+
+    // A locked tree ignores the collapse ArrowLeft asks for on an open node;
+    // move to the parent instead, as on a leaf
+    if (!allExpanded || code !== 'ArrowLeft') {
       return;
     }
-    const row = event.target as HTMLElement;
     // an open node is one whose subtree is rendered (Mantine 9.7.0 sets no aria-expanded)
     const isOpenNode =
       row.getAttribute?.('role') === 'treeitem' &&
@@ -1664,8 +2362,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         data-line-numbers={showLineNumbers || undefined}
         data-searching={debouncedQuery ? true : undefined}
         data-all-expanded={allExpanded || undefined}
+        ref={mergedRef}
         onKeyDown={handleKeyDown}
-        onKeyDownCapture={allExpanded ? handleLockedKeyDownCapture : undefined}
+        onKeyDownCapture={handleKeyDownCapture}
       >
         {showHeader && (
           <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
