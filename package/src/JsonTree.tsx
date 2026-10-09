@@ -468,8 +468,20 @@ export interface JsonTreeLabels {
   expandAll: string;
   /** @default 'Collapse all' */
   collapseAll: string;
+  /** Name of a node's toggle while it is closed @default 'Expand' */
+  expand: string;
+  /** Name of a node's toggle while it is open @default 'Collapse' */
+  collapse: string;
   /** Name of the toolbar's search toggle @default 'Search' */
   search: string;
+  /** Name of the button that empties the search field @default 'Clear search' */
+  clearSearch: string;
+  /**
+   * Text of a type badge (`showValueTypes`), given the built-in one (`int`,
+   * `float`, `bool`, `string`, `element`, `date`…) and the value's type
+   * @default (label) => label
+   */
+  typeBadge: (label: string, type: ValueType) => string;
   /** Toggle of a string cut by `collapseStringsAfterLength`, closed @default 'show more' */
   showMore: string;
   /** The same toggle, open @default 'show less' */
@@ -508,7 +520,11 @@ const DEFAULT_LABELS: JsonTreeLabels = {
   copyAll: 'Copy JSON',
   expandAll: 'Expand all',
   collapseAll: 'Collapse all',
+  expand: 'Expand',
+  collapse: 'Collapse',
   search: 'Search',
+  clearSearch: 'Clear search',
+  typeBadge: (label) => label,
   showMore: 'show more',
   showLess: 'show less',
   moreItems: (count, unit) => `… ${count} more ${unit}`,
@@ -1018,7 +1034,7 @@ function renderJSONNode(
   const typeBadge =
     showValueTypes && !chunk ? (
       <Text component="span" {...getStyles('typeBadge')} data-type={type}>
-        {getTypeLabel(type, value)}
+        {labels.typeBadge(getTypeLabel(type, value), type)}
       </Text>
     ) : null;
 
@@ -1361,6 +1377,7 @@ function renderJSONNode(
         <ActionIcon
           size="xs"
           variant="subtle"
+          aria-label={expanded ? labels.collapse : labels.expand}
           onClick={handleToggleExpanded}
           {...getStyles('expandCollapse')}
         >
@@ -2625,7 +2642,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                 size="sm"
                 leftSection={<IconSearch size={14} />}
                 rightSection={
-                  activeSearchQuery ? <CloseButton size="sm" onClick={handleClearSearch} /> : null
+                  activeSearchQuery ? (
+                    <CloseButton
+                      size="sm"
+                      aria-label={labels.clearSearch}
+                      onClick={handleClearSearch}
+                    />
+                  ) : null
                 }
                 {...searchInputProps}
                 {...getStyles('searchInput', {

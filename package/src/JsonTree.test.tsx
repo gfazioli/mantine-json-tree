@@ -2477,6 +2477,32 @@ describe('labels', () => {
     expect(getByRole('button', { name: 'Copy JSON' })).toBeInTheDocument();
     // one per row, containers included: root, age, text, list and its 3 items, name
     expect(getAllByRole('button', { name: 'Copy' })).toHaveLength(8);
+    // every container's toggle is named by its state: root and list are open
+    expect(getAllByRole('button', { name: 'Collapse' })).toHaveLength(2);
+    // nothing in the tree is an unnamed button
+    getAllByRole('button').forEach((button) => expect(button).toHaveAccessibleName());
+  });
+
+  it('names the clear-search button and translates the type badges', async () => {
+    const { getByRole, container } = render(
+      <JsonTree
+        data={{ n: 1, f: 1.5, ok: true }}
+        defaultExpanded
+        withSearch
+        searchQuery="1"
+        searchDebounce={0}
+        showValueTypes
+        labels={{
+          clearSearch: 'Svuota la ricerca',
+          typeBadge: (label) => ({ int: 'intero', float: 'decimale' })[label] ?? label,
+        }}
+      />
+    );
+    await userEvent.click(getByRole('button', { name: 'Search' }));
+    expect(getByRole('button', { name: 'Svuota la ricerca' })).toBeInTheDocument();
+    const badges = Array.from(container.querySelectorAll('.typeBadge')).map((el) => el.textContent);
+    expect(badges).toEqual(expect.arrayContaining(['intero', 'decimale']));
+    expect(badges).not.toContain('int');
   });
 
   it('switches a copy button to its copied name', async () => {
