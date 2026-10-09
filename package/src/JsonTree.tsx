@@ -8,6 +8,7 @@ import {
   createVarsResolver,
   Factory,
   factory,
+  filterProps,
   getTreeExpandedState,
   Group,
   MantineRadius,
@@ -191,9 +192,11 @@ export interface JsonTreeBaseProps {
   indentWidth?: number;
 
   /**
-   * Every built-in string: the names screen readers announce for the icon
+   * The built-in strings: the names screen readers announce for the icon
    * buttons, the "show more" toggles, the "… N more items" row, the editors'
-   * names and their validation messages. Pass only the ones to change.
+   * names and their validation messages. Pass only the ones to change. The
+   * search placeholder and the key count badge keep their own props,
+   * `searchPlaceholder` and `keyCountBadgeLabel`.
    */
   labels?: Partial<JsonTreeLabels>;
 
@@ -472,7 +475,7 @@ export interface JsonTreeLabels {
   /** The same toggle, open @default 'show less' */
   showLess: string;
   /** The row closing a container cut by `maxDisplayLength` @default (count, unit) => `… ${count} more ${unit}` */
-  moreItems: (count: number, unit: 'items' | 'keys' | 'entries') => string;
+  moreItems: (count: number, unit: JsonTreeMoreRow['unit']) => string;
   /** @default 'Add key' */
   addKey: string;
   /** @default 'Add item' */
@@ -686,6 +689,9 @@ function toLimit(limit: number | false | undefined) {
 
 const noop = () => {};
 
+/** An icon button's accessible name, shown as its tooltip too */
+const named = (label: string) => ({ 'aria-label': label, title: label });
+
 const ADD_ICON = <IconPlus size={12} />;
 const MOVE_UP_ICON = <IconArrowUp size={12} />;
 const MOVE_DOWN_ICON = <IconArrowDown size={12} />;
@@ -801,16 +807,22 @@ function highlightText(
   );
 }
 
+/** A copy button that turns green with a check for a moment after a copy: on each row, and in the toolbar */
 function CopyNodeButton({
   icon,
   getStyles,
   onCopy,
-  labels,
+  label,
+  copiedLabel,
+  inToolbar = false,
 }: {
   icon: React.ReactNode;
   getStyles: RenderNodeContext['getStyles'];
   onCopy: (e: React.MouseEvent) => Promise<boolean>;
-  labels: JsonTreeLabels;
+  label: string;
+  copiedLabel: string;
+  /** The toolbar's copy-all button: larger, its own selector, and a tooltip */
+  inToolbar?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -838,16 +850,18 @@ function CopyNodeButton({
     }, 1500);
   };
 
+  const name = copied ? copiedLabel : label;
   return (
     <ActionIcon
-      size="xs"
+      size={inToolbar ? 'sm' : 'xs'}
       variant="subtle"
       color={copied ? 'green' : 'gray'}
-      aria-label={copied ? labels.copied : labels.copy}
+      aria-label={name}
+      title={inToolbar ? name : undefined}
       onClick={handleClick}
-      {...getStyles('copyButton')}
+      {...getStyles(inToolbar ? 'copyAllButton' : 'copyButton')}
     >
-      {copied ? <IconCheck size={12} /> : icon}
+      {copied ? <IconCheck size={inToolbar ? 16 : 12} /> : icon}
     </ActionIcon>
   );
 }
@@ -899,7 +913,6 @@ function renderJSONNode(
     highlightNode,
     withQuotes,
     withKeyQuotes,
-    indentWidth = 32,
   } = props;
   const { labels } = ctx;
 
@@ -916,9 +929,8 @@ function renderJSONNode(
         <div
           key={i}
           {...getStyles('indentGuide', {
-            style: {
-              left: `${i * indentWidth + 8}px`,
-            },
+            // positioned in CSS from the Tree's own --level-offset (indentWidth)
+            style: { '--json-tree-guide-index': i } as React.CSSProperties,
           })}
           data-color-index={colorIndex}
         />
@@ -944,6 +956,7 @@ function renderJSONNode(
         value={editor.value}
         type="string"
         ariaLabel={editor.label}
+        messages={labels}
         editorProps={{
           ...ctx.editorProps,
           placeholder: ctx.editorProps?.placeholder ?? editor.placeholder,
@@ -1266,7 +1279,8 @@ function renderJSONNode(
             icon={copyToClipboardIcon}
             getStyles={getStyles}
             onCopy={handleCopy}
-            labels={labels}
+            label={labels.copy}
+            copiedLabel={labels.copied}
           />
         )}
 
@@ -1383,7 +1397,8 @@ function renderJSONNode(
           icon={copyToClipboardIcon}
           getStyles={getStyles}
           onCopy={handleCopy}
-          labels={labels}
+          label={labels.copy}
+          copiedLabel={labels.copied}
         />
       )}
 
@@ -1562,7 +1577,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   });
 
   const responsiveClassName = useRandomClassName();
-  const labels: JsonTreeLabels = { ...DEFAULT_LABELS, ..._labels };
+  const labels: JsonTreeLabels = { ...DEFAULT_LABELS, ...filterProps(_labels ?? {}) };
   const rootRef = useRef<HTMLDivElement>(null);
   const mergedRef = useMergedRef(ref, rootRef);
 
@@ -1572,11 +1587,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
     () => [
-      // `false` drops the root's label, not its place in every path
+      // `false` drops the root's label; an undefined path falls back to `root`,
+      // so every path keeps its prefix
       convertToTreeData(
         data,
-        rootName === false ? undefined : (rootName ?? 'root'),
-        typeof rootName === 'string' ? rootName : 'root',
+        rootName === false ? undefined : rootName,
+        rootName === false ? undefined : rootName,
         0,
         displayFunctions,
         [],
@@ -2404,18 +2420,17 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
   }, [onExpandedChange, tree]);
 
-  // Global copy handler with visual feedback
-  const [copiedAll, setCopiedAll] = useState(false);
+  // Global copy; the button shows the copied state itself
   const handleCopyAll = useCallback(async () => {
     const json = stringifyValue(data);
     try {
       await navigator.clipboard.writeText(json);
       onCopyAll?.(json);
       onCopy?.(json, data);
-      setCopiedAll(true);
-      setTimeout(() => setCopiedAll(false), 1500);
+      return true;
     } catch {
       // Clipboard write may fail silently
+      return false;
     }
   }, [data, onCopyAll, onCopy]);
 
@@ -2547,9 +2562,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   size="sm"
                   variant={searchOpen ? 'light' : 'subtle'}
                   color="gray"
-                  aria-label={labels.search}
+                  {...named(labels.search)}
                   aria-pressed={searchOpen}
-                  title={labels.search}
                   onClick={() => {
                     if (searchOpen) {
                       handleCloseSearch();
@@ -2569,8 +2583,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
-                    aria-label={labels.expandAll}
-                    title={labels.expandAll}
+                    {...named(labels.expandAll)}
                     onClick={handleExpandAll}
                     {...getStyles('controls')}
                   >
@@ -2580,8 +2593,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
-                    aria-label={labels.collapseAll}
-                    title={labels.collapseAll}
+                    {...named(labels.collapseAll)}
                     onClick={handleCollapseAll}
                     {...getStyles('controls')}
                   >
@@ -2591,17 +2603,14 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
               )}
 
               {withCopyAll && (
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color={copiedAll ? 'green' : 'gray'}
-                  aria-label={copiedAll ? labels.copied : labels.copyAll}
-                  title={copiedAll ? labels.copied : labels.copyAll}
-                  onClick={handleCopyAll}
-                  {...getStyles('copyAllButton')}
-                >
-                  {copiedAll ? <IconCheck size={16} /> : copyAllIcon}
-                </ActionIcon>
+                <CopyNodeButton
+                  inToolbar
+                  icon={copyAllIcon}
+                  getStyles={getStyles}
+                  onCopy={handleCopyAll}
+                  label={labels.copyAll}
+                  copiedLabel={labels.copied}
+                />
               )}
             </Group>
           </Group>

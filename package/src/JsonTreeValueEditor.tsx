@@ -1,5 +1,6 @@
 import { NumberInput, TextInput, type NumberInputProps, type TextInputProps } from '@mantine/core';
 import React, { useRef, useState } from 'react';
+import type { JsonTreeLabels } from './JsonTree';
 import type { ValueType } from './lib/utils';
 
 /**
@@ -33,10 +34,10 @@ export interface JsonTreeValueEditorProps {
   editorProps?: JsonTreeEditorProps;
 
   /** The field's name for assistive technology; `editorProps['aria-label']` wins over it */
-  ariaLabel?: string;
+  ariaLabel: string;
 
-  /** Messages for an empty or non-numeric number @default { required: 'Required', notANumber: 'Not a number' } */
-  messages?: { required: string; notANumber: string };
+  /** Messages for an empty or non-numeric number, from `labels` */
+  messages: Pick<JsonTreeLabels, 'required' | 'notANumber'>;
 }
 
 /**
@@ -60,7 +61,7 @@ export function JsonTreeValueEditor({
   validate,
   editorProps,
   ariaLabel,
-  messages = { required: 'Required', notANumber: 'Not a number' },
+  messages,
 }: JsonTreeValueEditorProps) {
   const [draft, setDraft] = useState<string | number>(() =>
     type === 'number' ? (value as number) : String(value ?? '')
@@ -131,7 +132,7 @@ export function JsonTreeValueEditor({
     // Without a name, assistive technology announces an empty edit field with no
     // clue which key it belongs to. The caller derives it from the data's own
     // key through `labels`, and a consumer can still override it here.
-    'aria-label': editorProps?.['aria-label'] ?? ariaLabel ?? 'Edit value',
+    'aria-label': editorProps?.['aria-label'] ?? ariaLabel,
     autoFocus: true,
     error,
     size: editorProps?.size ?? ('xs' as const),

@@ -206,6 +206,10 @@
   position: absolute;
   top: 0;
   bottom: 0;
+  /* One guide per level, from the indentation the Tree itself uses (--level-offset,
+     set from indentWidth), so they agree at any scale, font size and direction;
+     8px puts the line under the toggle's centre */
+  inset-inline-start: calc(var(--level-offset) * var(--json-tree-guide-index) + 8px);
   width: 1px;
   pointer-events: none;
   opacity: 0.4;
