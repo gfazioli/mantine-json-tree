@@ -105,6 +105,30 @@ function containerAt(root: unknown, segments: JsonTreePathSegments) {
   return container;
 }
 
+/**
+ * A copy of `source` with its string keys passed through `rename` (`null`
+ * drops one). Symbol keys come along untouched, as a spread would carry them,
+ * and a `__proto__` key stays a key rather than becoming the prototype.
+ */
+function copyObject(source: object, rename: (key: string) => string | null) {
+  const next: Record<PropertyKey, unknown> = {};
+  for (const key of Reflect.ownKeys(source)) {
+    if (!Object.prototype.propertyIsEnumerable.call(source, key)) {
+      continue;
+    }
+    const target = typeof key === 'string' ? rename(key) : key;
+    if (target !== null) {
+      Object.defineProperty(next, target, {
+        value: (source as Record<PropertyKey, unknown>)[key],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+  return next;
+}
+
 /** Split an address into its container and its last step, which must be a key or an index. */
 function splitLast(segments: JsonTreePathSegments) {
   if (segments.length === 0) {
@@ -131,10 +155,11 @@ export function renameKeyAtPath<T>(root: T, segments: JsonTreePathSegments, newK
   if (newKey !== last && Object.hasOwn(container, newKey)) {
     throw new Error(`JsonTree: key "${newKey}" already exists on this object.`);
   }
-  const next = Object.fromEntries(
-    Object.entries(container).map(([key, value]) => [key === last ? newKey : key, value])
+  return setValueAtPath(
+    root,
+    parent,
+    copyObject(container, (key) => (key === last ? newKey : key))
   );
-  return setValueAtPath(root, parent, next);
 }
 
 /**
@@ -162,7 +187,7 @@ export function removeAtPath<T>(root: T, segments: JsonTreePathSegments): T {
   return setValueAtPath(
     root,
     parent,
-    Object.fromEntries(Object.entries(container).filter(([k]) => k !== key))
+    copyObject(container, (k) => (k === key ? null : k))
   );
 }
 
