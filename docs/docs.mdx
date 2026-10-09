@@ -171,7 +171,7 @@ export const Cap = ({ title, note }) => (
       <Table.Td ta="center"><Yes /></Table.Td>
     </Table.Tr>
     <Table.Tr>
-      <Table.Td><Cap title="Translatable labels" note="labels replaces every built-in string, editor messages included, and names every icon button for screen readers; core takes copy, copied, expand all and collapse all" /></Table.Td>
+      <Table.Td><Cap title="Translatable labels" note="labels replaces the built-in strings — buttons, toggles, type badges, editor names and messages — and names every icon button for screen readers; core takes copy, copied, expand all and collapse all" /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
     </Table.Tr>
@@ -488,8 +488,8 @@ Use the `onNodeClick` callback to handle clicks on any node in the tree, and the
 Every string `JsonTree` renders or announces on its own comes from `labels`, so a tree can be translated without touching the component. Pass only the ones to change; the rest keep their English defaults.
 
 The labels cover:
-- **Icon buttons**: copy, copied, copy all, expand all, collapse all, search, add, remove, move up and move down. Every icon button carries its label as its accessible name, so a screen reader announces "Copy" rather than an unnamed button. The toolbar's buttons also show it as a tooltip.
-- **Text on screen**: "show more" / "show less" and the "… N more items" row. `moreItems` is a function of the count and of the unit (`items`, `keys` or `entries`), for languages whose plurals follow different rules.
+- **Icon buttons**: copy, copied, copy all, expand all, collapse all, a node's expand / collapse toggle, search, clear search, add, remove, move up and move down. Every icon button carries its label as its accessible name, so a screen reader announces "Copy" rather than an unnamed button. The toolbar's buttons also show it as a tooltip.
+- **Text on screen**: "show more" / "show less", the "… N more items" row and the type badges of `showValueTypes`. `moreItems` is a function of the count and of the unit (`items`, `keys` or `entries`), for languages whose plurals follow different rules; `typeBadge` receives the built-in badge (`int`, `float`, `bool`…) and the value's type.
 - **Inline editors**: the names of the new-key, rename and value inputs (`rename` and `edit` take the key), and their validation messages (`keyExists`, `required`, `notANumber`).
 
 The search placeholder keeps its own prop, `searchPlaceholder`, and the key count badge its own `keyCountBadgeLabel`.
