@@ -2421,11 +2421,12 @@ describe('indentWidth', () => {
     );
     const tree = container.querySelector<HTMLElement>('[data-tree-root]')!;
     expect(tree.style.getPropertyValue('--level-offset')).toContain('1.25rem');
-    const lefts = Array.from(container.querySelectorAll<HTMLElement>('.indentGuide')).map(
-      (el) => el.style.left
+    // the guides are placed in CSS from the same --level-offset, by level index
+    const indices = Array.from(container.querySelectorAll<HTMLElement>('.indentGuide')).map((el) =>
+      el.style.getPropertyValue('--json-tree-guide-index')
     );
-    expect(lefts).toEqual(expect.arrayContaining(['8px', '28px', '48px']));
-    expect(lefts).not.toContain('40px');
+    expect(new Set(indices)).toEqual(new Set(['0', '1', '2']));
+    expect(container.querySelector<HTMLElement>('.indentGuide')!.style.left).toBe('');
   });
 });
 
