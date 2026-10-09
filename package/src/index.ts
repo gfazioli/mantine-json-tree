@@ -9,6 +9,7 @@ export type {
   JsonTreeFunctionDisplay,
   JsonTreeHighlight,
   JsonTreeHighlightPayload,
+  JsonTreeLabels,
   JsonTreeNodePayload,
   JsonTreeProps,
   JsonTreeStructuralEdit,
