@@ -179,8 +179,23 @@ export interface JsonTreeBaseProps {
   /** The data to display (object, array, or any JSON-serializable value) */
   data: unknown;
 
-  /** Label for the root node @default 'root' */
-  rootName?: string;
+  /**
+   * Label for the root node, or `false` to show the root without a label. Paths
+   * keep their `root` prefix either way, so `expanded` and the callbacks are
+   * unaffected.
+   * @default 'root'
+   */
+  rootName?: string | false;
+
+  /** Indentation of each nesting level, in px @default 32 */
+  indentWidth?: number;
+
+  /**
+   * Every built-in string: the names screen readers announce for the icon
+   * buttons, the "show more" toggles, the "… N more items" row, the editors'
+   * names and their validation messages. Pass only the ones to change.
+   */
+  labels?: Partial<JsonTreeLabels>;
 
   /** Whether nodes should be expanded by default @default false */
   defaultExpanded?: boolean;
@@ -438,6 +453,76 @@ export interface JsonTreeBaseProps {
   validateKey?: (key: string, container: JsonTreeNodePayload) => string | null;
 }
 
+/** Every string JsonTree renders or announces on its own */
+export interface JsonTreeLabels {
+  /** Name of a row's copy button @default 'Copy' */
+  copy: string;
+  /** Name of a copy button right after a copy @default 'Copied' */
+  copied: string;
+  /** Name of the toolbar's copy button @default 'Copy JSON' */
+  copyAll: string;
+  /** @default 'Expand all' */
+  expandAll: string;
+  /** @default 'Collapse all' */
+  collapseAll: string;
+  /** Name of the toolbar's search toggle @default 'Search' */
+  search: string;
+  /** Toggle of a string cut by `collapseStringsAfterLength`, closed @default 'show more' */
+  showMore: string;
+  /** The same toggle, open @default 'show less' */
+  showLess: string;
+  /** The row closing a container cut by `maxDisplayLength` @default (count, unit) => `… ${count} more ${unit}` */
+  moreItems: (count: number, unit: 'items' | 'keys' | 'entries') => string;
+  /** @default 'Add key' */
+  addKey: string;
+  /** @default 'Add item' */
+  addItem: string;
+  /** @default 'Remove' */
+  remove: string;
+  /** @default 'Move up' */
+  moveUp: string;
+  /** @default 'Move down' */
+  moveDown: string;
+  /** Name of the input for a new key @default 'New key' */
+  newKey: string;
+  /** Placeholder of the input for a new key @default 'key' */
+  newKeyPlaceholder: string;
+  /** Name of the input renaming a key @default (key) => `Rename ${key}` */
+  rename: (key: string) => string;
+  /** Name of the value editor @default (key) => `Edit ${key}` */
+  edit: (key: string) => string;
+  /** A typed key the object already has @default 'Key already exists' */
+  keyExists: string;
+  /** An empty number @default 'Required' */
+  required: string;
+  /** A number that does not parse @default 'Not a number' */
+  notANumber: string;
+}
+
+const DEFAULT_LABELS: JsonTreeLabels = {
+  copy: 'Copy',
+  copied: 'Copied',
+  copyAll: 'Copy JSON',
+  expandAll: 'Expand all',
+  collapseAll: 'Collapse all',
+  search: 'Search',
+  showMore: 'show more',
+  showLess: 'show less',
+  moreItems: (count, unit) => `… ${count} more ${unit}`,
+  addKey: 'Add key',
+  addItem: 'Add item',
+  remove: 'Remove',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
+  newKey: 'New key',
+  newKeyPlaceholder: 'key',
+  rename: (key) => `Rename ${key}`,
+  edit: (key) => `Edit ${key}`,
+  keyExists: 'Key already exists',
+  required: 'Required',
+  notANumber: 'Not a number',
+};
+
 /** Display mode for functions in JSON data */
 export type JsonTreeFunctionDisplay = 'as-string' | 'hide' | 'as-object';
 
@@ -513,6 +598,7 @@ export type JsonTreeFactory = Factory<{
 
 export const defaultProps: Partial<JsonTreeProps> = {
   rootName: 'root',
+  indentWidth: 32,
   defaultExpanded: false,
   maxDepth: 2,
   withExpandAll: false,
@@ -560,12 +646,14 @@ function CollapsibleString({
   value,
   limit,
   withQuotes,
+  labels,
   getStyles,
   children,
 }: {
   value: string;
   limit: number;
   withQuotes?: boolean;
+  labels: JsonTreeLabels;
   getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
   children: (display: string) => React.ReactNode;
 }) {
@@ -585,7 +673,7 @@ function CollapsibleString({
           setOpen((current) => !current);
         }}
       >
-        {open ? 'show less' : 'show more'}
+        {open ? labels.showLess : labels.showMore}
       </UnstyledButton>
     </>
   );
@@ -649,6 +737,7 @@ const FORM_CONTROL_SELECTOR =
 
 interface RenderNodeContext {
   getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
+  labels: JsonTreeLabels;
   copyToClipboardIcon: React.ReactNode;
   expandControlIcon: React.ReactNode;
   collapseControlIcon: React.ReactNode;
@@ -716,10 +805,12 @@ function CopyNodeButton({
   icon,
   getStyles,
   onCopy,
+  labels,
 }: {
   icon: React.ReactNode;
   getStyles: RenderNodeContext['getStyles'];
   onCopy: (e: React.MouseEvent) => Promise<boolean>;
+  labels: JsonTreeLabels;
 }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -752,6 +843,7 @@ function CopyNodeButton({
       size="xs"
       variant="subtle"
       color={copied ? 'green' : 'gray'}
+      aria-label={copied ? labels.copied : labels.copy}
       onClick={handleClick}
       {...getStyles('copyButton')}
     >
@@ -807,7 +899,9 @@ function renderJSONNode(
     highlightNode,
     withQuotes,
     withKeyQuotes,
+    indentWidth = 32,
   } = props;
+  const { labels } = ctx;
 
   // Render indent guides (vertical lines)
   const renderIndentGuides = () => {
@@ -823,7 +917,7 @@ function renderJSONNode(
           key={i}
           {...getStyles('indentGuide', {
             style: {
-              left: `${i * 32 + 8}px`,
+              left: `${i * indentWidth + 8}px`,
             },
           })}
           data-color-index={colorIndex}
@@ -849,9 +943,9 @@ function renderJSONNode(
       <JsonTreeValueEditor
         value={editor.value}
         type="string"
+        ariaLabel={editor.label}
         editorProps={{
           ...ctx.editorProps,
-          'aria-label': ctx.editorProps?.['aria-label'] ?? editor.label,
           placeholder: ctx.editorProps?.placeholder ?? editor.placeholder,
         }}
         validate={(next) => editor.validate(String(next))}
@@ -885,13 +979,13 @@ function renderJSONNode(
               ctx.onRevealMore?.(more);
             }}
           >
-            … {more.hidden} more {more.unit}
+            {labels.moreItems(more.hidden, more.unit)}
           </UnstyledButton>
         ) : (
           keyEditor({
             value: '',
-            label: 'New key',
-            placeholder: 'key',
+            label: labels.newKey,
+            placeholder: labels.newKeyPlaceholder,
             validate: (next) => ctx.validateNewKey?.(next) ?? null,
             commit: (next) => ctx.onAddKey?.(next),
           })
@@ -976,7 +1070,7 @@ function renderJSONNode(
         {caps?.rename && ctx.renamingKey === editKey ? (
           keyEditor({
             value: key!,
-            label: `Rename ${key}`,
+            label: labels.rename(key!),
             validate: (next) => ctx.validateRename?.(jsonNode, next) ?? null,
             commit: (next) => ctx.onRename?.(jsonNode, next),
           })
@@ -1036,7 +1130,7 @@ function renderJSONNode(
       {caps.add &&
         actionButton(
           'add',
-          type === 'array' ? 'Add item' : 'Add key',
+          type === 'array' ? labels.addItem : labels.addKey,
           ADD_ICON,
           'addButton',
           (row) => ctx.onStartAdd?.(jsonNode, row)
@@ -1044,7 +1138,7 @@ function renderJSONNode(
       {caps.reorder &&
         actionButton(
           'move-up',
-          'Move up',
+          labels.moveUp,
           MOVE_UP_ICON,
           'moveButton',
           () => ctx.onMove?.(jsonNode, -1),
@@ -1053,14 +1147,14 @@ function renderJSONNode(
       {caps.reorder &&
         actionButton(
           'move-down',
-          'Move down',
+          labels.moveDown,
           MOVE_DOWN_ICON,
           'moveButton',
           () => ctx.onMove?.(jsonNode, 1),
           index >= caps.parentLength - 1
         )}
       {caps.remove &&
-        actionButton('remove', 'Remove', REMOVE_ICON, 'removeButton', () =>
+        actionButton('remove', labels.remove, REMOVE_ICON, 'removeButton', () =>
           ctx.onRemove?.(jsonNode)
         )}
     </>
@@ -1099,7 +1193,8 @@ function renderJSONNode(
                 <JsonTreeValueEditor
                   value={value}
                   type={type}
-                  label={key ?? path}
+                  ariaLabel={labels.edit(key ?? path)}
+                  messages={labels}
                   editorProps={ctx.editorProps}
                   validate={(next) => ctx.validateNode?.(jsonNode, next) ?? null}
                   onCommit={(next) => ctx.onCommitEdit?.(jsonNode, next)}
@@ -1153,6 +1248,7 @@ function renderJSONNode(
                 value={value as string}
                 limit={collapseLimit}
                 withQuotes={withQuotes}
+                labels={labels}
                 getStyles={getStyles}
               >
                 {renderValue}
@@ -1166,7 +1262,12 @@ function renderJSONNode(
         {typeBadge}
 
         {withCopyToClipboard && (
-          <CopyNodeButton icon={copyToClipboardIcon} getStyles={getStyles} onCopy={handleCopy} />
+          <CopyNodeButton
+            icon={copyToClipboardIcon}
+            getStyles={getStyles}
+            onCopy={handleCopy}
+            labels={labels}
+          />
         )}
 
         {editActions}
@@ -1278,15 +1379,12 @@ function renderJSONNode(
       {typeBadge}
 
       {withCopyToClipboard && (
-        <ActionIcon
-          size="xs"
-          variant="subtle"
-          color="gray"
-          onClick={handleCopy}
-          {...getStyles('copyButton')}
-        >
-          {copyToClipboardIcon}
-        </ActionIcon>
+        <CopyNodeButton
+          icon={copyToClipboardIcon}
+          getStyles={getStyles}
+          onCopy={handleCopy}
+          labels={labels}
+        />
       )}
 
       {editActions}
@@ -1436,6 +1534,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     showValueTypes: _showValueTypes,
     withQuotes,
     withKeyQuotes,
+    indentWidth,
+    labels: _labels,
 
     classNames,
     style,
@@ -1462,6 +1562,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   });
 
   const responsiveClassName = useRandomClassName();
+  const labels: JsonTreeLabels = { ...DEFAULT_LABELS, ..._labels };
   const rootRef = useRef<HTMLDivElement>(null);
   const mergedRef = useMergedRef(ref, rootRef);
 
@@ -1471,10 +1572,17 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
     () => [
-      convertToTreeData(data, rootName ?? 'root', rootName ?? 'root', 0, displayFunctions, [], [], {
-        sortKeys,
-        groupArraysAfterLength,
-      }),
+      // `false` drops the root's label, not its place in every path
+      convertToTreeData(
+        data,
+        rootName === false ? undefined : (rootName ?? 'root'),
+        typeof rootName === 'string' ? rootName : 'root',
+        0,
+        displayFunctions,
+        [],
+        [],
+        { sortKeys, groupArraysAfterLength }
+      ),
     ],
     [data, rootName, displayFunctions, sortKeys, groupArraysAfterLength]
   );
@@ -1893,7 +2001,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   /** Vet a key typed for a container; a rename may keep its own `currentKey` */
   const vetKey = (container: JsonTreeNodePayload, key: string, currentKey?: string) => {
     if (key !== currentKey && Object.hasOwn(container.value as object, key)) {
-      return 'Key already exists';
+      return labels.keyExists;
     }
     return validateKey?.(key, container) ?? null;
   };
@@ -2313,6 +2421,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   const renderCtx: RenderNodeContext = {
     getStyles,
+    labels,
     copyToClipboardIcon,
     expandControlIcon,
     collapseControlIcon,
@@ -2382,7 +2491,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     <Tree
       data={displayedTreeData}
       tree={treeController}
-      levelOffset={32}
+      levelOffset={indentWidth}
       renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
     />
   );
@@ -2438,6 +2547,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   size="sm"
                   variant={searchOpen ? 'light' : 'subtle'}
                   color="gray"
+                  aria-label={labels.search}
+                  aria-pressed={searchOpen}
+                  title={labels.search}
                   onClick={() => {
                     if (searchOpen) {
                       handleCloseSearch();
@@ -2457,6 +2569,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
+                    aria-label={labels.expandAll}
+                    title={labels.expandAll}
                     onClick={handleExpandAll}
                     {...getStyles('controls')}
                   >
@@ -2466,6 +2580,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
+                    aria-label={labels.collapseAll}
+                    title={labels.collapseAll}
                     onClick={handleCollapseAll}
                     {...getStyles('controls')}
                   >
@@ -2479,6 +2595,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   size="sm"
                   variant="subtle"
                   color={copiedAll ? 'green' : 'gray'}
+                  aria-label={copiedAll ? labels.copied : labels.copyAll}
+                  title={copiedAll ? labels.copied : labels.copyAll}
                   onClick={handleCopyAll}
                   {...getStyles('copyAllButton')}
                 >

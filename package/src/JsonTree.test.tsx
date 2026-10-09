@@ -2406,6 +2406,156 @@ describe('structural edit helpers', () => {
   });
 });
 
+describe('indentWidth', () => {
+  const data = { a: { b: { c: 1 } } };
+
+  it('keeps 32px per level by default', () => {
+    const { container } = render(<JsonTree data={data} defaultExpanded maxDepth={-1} />);
+    const tree = container.querySelector<HTMLElement>('[data-tree-root]')!;
+    expect(tree.style.getPropertyValue('--level-offset')).toContain('2rem');
+  });
+
+  it('sets the level offset and moves the indent guides with it', () => {
+    const { container } = render(
+      <JsonTree data={data} defaultExpanded maxDepth={-1} indentWidth={20} showIndentGuides />
+    );
+    const tree = container.querySelector<HTMLElement>('[data-tree-root]')!;
+    expect(tree.style.getPropertyValue('--level-offset')).toContain('1.25rem');
+    const lefts = Array.from(container.querySelectorAll<HTMLElement>('.indentGuide')).map(
+      (el) => el.style.left
+    );
+    expect(lefts).toEqual(expect.arrayContaining(['8px', '28px', '48px']));
+    expect(lefts).not.toContain('40px');
+  });
+});
+
+describe('rootName={false}', () => {
+  it('shows the root without a label and keeps the paths', async () => {
+    const onNodeClick = jest.fn();
+    const { container } = render(
+      <JsonTree data={{ a: 1 }} defaultExpanded rootName={false} onNodeClick={onNodeClick} />
+    );
+    const keys = Array.from(container.querySelectorAll('.key')).map((el) => el.textContent);
+    expect(keys).toEqual(['a']);
+    expect(container.querySelector('li[role="treeitem"][data-value="root"]')).not.toBeNull();
+    expect(container.querySelector('li[role="treeitem"][data-value="root.a"]')).not.toBeNull();
+    await userEvent.click(container.querySelector('[data-value="1"]')!);
+    expect(onNodeClick).toHaveBeenCalledWith('root.a', 1);
+  });
+
+  it('shows a primitive root as its value alone', () => {
+    const { container } = render(<JsonTree data="hello" rootName={false} />);
+    expect(container.querySelector('.key')).toBeNull();
+    expect(container.querySelector('.value')).toHaveTextContent('"hello"');
+  });
+
+  it('still names the root by default', () => {
+    const { container } = render(<JsonTree data={{ a: 1 }} />);
+    expect(container.querySelector('.key')).toHaveTextContent('root');
+  });
+});
+
+describe('labels', () => {
+  const data = { age: 36, text: 'abcdefghij', list: [1, 2, 3], name: 'Ada' };
+
+  it('names every icon button by default', () => {
+    const { getByRole, getAllByRole } = render(
+      <JsonTree
+        data={data}
+        title="data"
+        defaultExpanded
+        withSearch
+        withExpandAll
+        withCopyAll
+        withCopyToClipboard
+      />
+    );
+    expect(getByRole('button', { name: 'Search' })).toHaveAttribute('aria-pressed', 'false');
+    expect(getByRole('button', { name: 'Expand all' })).toHaveAttribute('title', 'Expand all');
+    expect(getByRole('button', { name: 'Collapse all' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Copy JSON' })).toBeInTheDocument();
+    // one per row, containers included: root, age, text, list and its 3 items, name
+    expect(getAllByRole('button', { name: 'Copy' })).toHaveLength(8);
+  });
+
+  it('switches a copy button to its copied name', async () => {
+    const { restore } = stubClipboard();
+    restoreClipboardAfter = restore;
+    const { getAllByRole, findAllByRole } = render(
+      <JsonTree data={{ a: 1 }} defaultExpanded withCopyToClipboard />
+    );
+    await userEvent.click(getAllByRole('button', { name: 'Copy' })[1]);
+    expect(await findAllByRole('button', { name: 'Copied' })).toHaveLength(1);
+  });
+
+  it('replaces every built-in string it is given', async () => {
+    const user = userEvent.setup();
+    const { container, getByRole, getAllByRole, getByText } = render(
+      <JsonTree
+        data={data}
+        title="data"
+        defaultExpanded
+        maxDepth={-1}
+        withSearch
+        withExpandAll
+        withCopyAll
+        withCopyToClipboard
+        collapseStringsAfterLength={4}
+        maxDisplayLength={3}
+        editable
+        structuralEdits
+        onChange={() => {}}
+        labels={{
+          copy: 'Copia',
+          copyAll: 'Copia JSON',
+          expandAll: 'Espandi tutto',
+          collapseAll: 'Comprimi tutto',
+          search: 'Cerca',
+          showMore: 'mostra altro',
+          moreItems: (count) => `… altri ${count}`,
+          addItem: 'Aggiungi elemento',
+          addKey: 'Aggiungi chiave',
+          remove: 'Elimina',
+          edit: (key) => `Modifica ${key}`,
+          rename: (key) => `Rinomina ${key}`,
+          required: 'Obbligatorio',
+          keyExists: 'Chiave già presente',
+        }}
+      />
+    );
+    expect(getByRole('button', { name: 'Cerca' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Espandi tutto' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Comprimi tutto' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Copia JSON' })).toBeInTheDocument();
+    expect(getAllByRole('button', { name: 'Copia' }).length).toBeGreaterThan(0);
+    expect(getByRole('button', { name: 'mostra altro' })).toBeInTheDocument();
+    expect(getByText('… altri 1')).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Aggiungi elemento' })).toBeInTheDocument();
+    expect(getAllByRole('button', { name: 'Elimina' }).length).toBeGreaterThan(0);
+
+    // the value editor's name and its validation message
+    await user.click(
+      container.querySelector('li[role="treeitem"][data-value="root.age"] [data-edit-key]')!
+    );
+    const editor = getByRole('textbox', { name: 'Modifica age' });
+    await user.clear(editor);
+    await user.keyboard('{Enter}');
+    expect(getByText('Obbligatorio')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    // the rename input's name and the duplicate-key message
+    await user.click(
+      container.querySelector(
+        'li[role="treeitem"][data-value="root.text"] [data-json-tree-action="rename"]'
+      )!
+    );
+    const rename = getByRole('textbox', { name: 'Rinomina text' });
+    await user.clear(rename);
+    await user.type(rename, 'age{Enter}');
+    expect(getByText('Chiave già presente')).toBeInTheDocument();
+  });
+});
+
 describe('Containers with nothing to show', () => {
   const secret = function secretFn() {
     return 'SECRET';

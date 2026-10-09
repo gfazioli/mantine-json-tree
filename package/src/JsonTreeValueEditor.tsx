@@ -32,8 +32,11 @@ export interface JsonTreeValueEditorProps {
   /** Props forwarded to the input */
   editorProps?: JsonTreeEditorProps;
 
-  /** The key being edited, used to name the field for assistive technology */
-  label?: string;
+  /** The field's name for assistive technology; `editorProps['aria-label']` wins over it */
+  ariaLabel?: string;
+
+  /** Messages for an empty or non-numeric number @default { required: 'Required', notANumber: 'Not a number' } */
+  messages?: { required: string; notANumber: string };
 }
 
 /**
@@ -56,7 +59,8 @@ export function JsonTreeValueEditor({
   onCancel,
   validate,
   editorProps,
-  label,
+  ariaLabel,
+  messages = { required: 'Required', notANumber: 'Not a number' },
 }: JsonTreeValueEditorProps) {
   const [draft, setDraft] = useState<string | number>(() =>
     type === 'number' ? (value as number) : String(value ?? '')
@@ -76,7 +80,7 @@ export function JsonTreeValueEditor({
       // NumberInput reports an empty field as '', and Number('') is 0 — committing
       // that would write a zero the user never typed while trying to clear it
       if (draft === '' || draft === null || draft === undefined) {
-        setError('Required');
+        setError(messages.required);
         return;
       }
     }
@@ -84,7 +88,7 @@ export function JsonTreeValueEditor({
     const next = parse();
 
     if (type === 'number' && !Number.isFinite(next as number)) {
-      setError('Not a number');
+      setError(messages.notANumber);
       return;
     }
 
@@ -125,9 +129,9 @@ export function JsonTreeValueEditor({
   const shared = {
     ...editorProps,
     // Without a name, assistive technology announces an empty edit field with no
-    // clue which key it belongs to. Derived from the data's own key, so the only
-    // English in it is the verb — and a consumer can still override it.
-    'aria-label': editorProps?.['aria-label'] ?? (label ? `Edit ${label}` : 'Edit value'),
+    // clue which key it belongs to. The caller derives it from the data's own
+    // key through `labels`, and a consumer can still override it here.
+    'aria-label': editorProps?.['aria-label'] ?? ariaLabel ?? 'Edit value',
     autoFocus: true,
     error,
     size: editorProps?.size ?? ('xs' as const),
