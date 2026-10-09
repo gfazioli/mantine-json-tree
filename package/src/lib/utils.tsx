@@ -31,6 +31,12 @@ export interface JSONTreeNodeData extends TreeNodeData {
      * data: it has no address, and its items keep their own paths.
      */
     chunk?: { start: number; end: number };
+    /**
+     * The type of the container this entry lives in, absent on the root. It
+     * tells an object key, which JSON quotes, from an array index, a `Map` or
+     * `Set` entry and a group label, which it never does.
+     */
+    parentType?: ValueType;
   };
 }
 
@@ -192,11 +198,12 @@ export function isExpandable(value: any): boolean {
 }
 
 /**
- * Format a primitive value for display.
+ * Format a primitive value for display. `withQuotes: false` drops the quotes
+ * around a string, and nothing else.
  */
-export function formatValue(value: any, type: ValueType): string {
+export function formatValue(value: any, type: ValueType, withQuotes = true): string {
   if (type === 'string') {
-    return `"${value}"`;
+    return withQuotes ? `"${value}"` : String(value);
   }
   if (type === 'null') {
     return 'null';
@@ -249,6 +256,15 @@ export function formatValue(value: any, type: ValueType): string {
     return '[]';
   }
   return String(value);
+}
+
+/**
+ * Format a key for display. Only an object key can be quoted: an array index, a
+ * `Map` or `Set` entry and a `[start…end]` group label are not keys JSON would
+ * write between quotes.
+ */
+export function formatKey(key: string, parentType: ValueType | undefined, withKeyQuotes = false) {
+  return withKeyQuotes && parentType === 'object' ? `"${key}"` : key;
 }
 
 /**
@@ -507,6 +523,11 @@ export function convertToTreeData(
     )
   );
   const isShown = (node: JSONTreeNodeData | null): node is JSONTreeNodeData => node !== null;
+  convertedChildren.forEach((child) => {
+    if (child?.nodeData) {
+      child.nodeData.parentType = type;
+    }
+  });
 
   let children: JSONTreeNodeData[];
   if (groupSize) {
@@ -534,6 +555,7 @@ export function convertToTreeData(
           depth: depth + 1,
           pathSegments: undefined,
           chunk: { start, end },
+          parentType: 'array',
         },
       });
     }
@@ -569,11 +591,23 @@ export interface SearchResult {
   expandedPaths: string[];
 }
 
+/** How keys and strings are displayed, so a search matches what is on screen. */
+export interface SearchTreeOptions {
+  /** Strings are shown between quotes @default true */
+  withQuotes?: boolean;
+  /** Object keys are shown between quotes @default false */
+  withKeyQuotes?: boolean;
+}
+
 /**
  * Search the tree data for nodes matching a query string.
- * Matches against key names and formatted values (case-insensitive).
+ * Matches against key names and formatted values (case-insensitive), as they are displayed.
  */
-export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResult {
+export function searchTree(
+  nodes: JSONTreeNodeData[],
+  query: string,
+  { withQuotes = true, withKeyQuotes = false }: SearchTreeOptions = {}
+): SearchResult {
   const matchedPaths = new Set<string>();
   const directMatches = new Set<string>();
   const expandedPaths = new Set<string>();
@@ -590,11 +624,14 @@ export function searchTree(nodes: JSONTreeNodeData[], query: string): SearchResu
 
     // A `[start…end]` group label is not a key of the data: searching "1" must not match it
     if (nd && !nd.chunk) {
-      if (nd.key !== undefined && String(nd.key).toLowerCase().includes(lowerQuery)) {
+      if (
+        nd.key !== undefined &&
+        formatKey(String(nd.key), nd.parentType, withKeyQuotes).toLowerCase().includes(lowerQuery)
+      ) {
         matches = true;
       }
       if (!matches && nd.type && nd.value !== undefined && !isExpandable(nd.value)) {
-        const formatted = formatValue(nd.value, nd.type);
+        const formatted = formatValue(nd.value, nd.type, withQuotes);
         if (formatted.toLowerCase().includes(lowerQuery)) {
           matches = true;
         }

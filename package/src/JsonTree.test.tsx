@@ -1427,6 +1427,129 @@ describe('JsonTree display options', () => {
       expect(getTypeLabel('date', new Date())).toBe('date');
     });
   });
+
+  describe('withQuotes and withKeyQuotes', () => {
+    const data = { name: 'Alice', nested: { city: 'Rome' }, list: ['x'], m: new Map([['k', 1]]) };
+    const keyTexts = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('.key')).map((el) => el.textContent);
+    const valueTexts = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('.value[data-type="string"]')).map(
+        (el) => el.textContent
+      );
+
+    it('quotes strings and leaves keys bare by default', () => {
+      const { container } = render(<JsonTree data={data} defaultExpanded maxDepth={-1} />);
+      expect(valueTexts(container)).toEqual(['"Alice"', '"Rome"', '"x"']);
+      expect(keyTexts(container)).toEqual([
+        'root',
+        'name',
+        'nested',
+        'city',
+        'list',
+        '0',
+        'm',
+        '[0] k',
+      ]);
+    });
+
+    it('drops the quotes around strings with withQuotes={false}', () => {
+      const { container } = render(
+        <JsonTree data={data} defaultExpanded maxDepth={-1} withQuotes={false} />
+      );
+      expect(valueTexts(container)).toEqual(['Alice', 'Rome', 'x']);
+    });
+
+    it('quotes object keys at every depth, never an index, a Map entry or a group', () => {
+      const { container } = render(
+        <JsonTree
+          data={{ ...data, long: [1, 2, 3] }}
+          defaultExpanded
+          maxDepth={-1}
+          withKeyQuotes
+          groupArraysAfterLength={2}
+        />
+      );
+      // the root's label is a name, not a key
+      expect(keyTexts(container)).toEqual([
+        'root',
+        '"name"',
+        '"nested"',
+        '"city"',
+        '"list"',
+        '0',
+        '"m"',
+        '[0] k',
+        '"long"',
+        '[0…1]',
+        '0',
+        '1',
+        '[2…2]',
+        '2',
+      ]);
+      // data-key keeps the raw key, for selectors and tests
+      expect(container.querySelector('[data-key="name"]')).toHaveTextContent('"name"');
+    });
+
+    it('applies withQuotes to a collapsed string, closed and open', async () => {
+      const { container, getByRole } = render(
+        <JsonTree
+          data={{ text: 'abcdefghij' }}
+          defaultExpanded
+          collapseStringsAfterLength={3}
+          withQuotes={false}
+        />
+      );
+      expect(valueTexts(container)).toEqual(['abc…']);
+      await userEvent.click(getByRole('button', { name: 'show more' }));
+      expect(valueTexts(container)).toEqual(['abcdefghij']);
+    });
+
+    it('matches and highlights the text as it is displayed', () => {
+      const quoted = searchTree([convertToTreeData({ name: 'Alice' })], '"name"', {
+        withKeyQuotes: true,
+      });
+      expect(quoted.directMatches.has('root.name')).toBe(true);
+      expect(searchTree([convertToTreeData({ name: 'Alice' })], '"name"').directMatches.size).toBe(
+        0
+      );
+      expect(
+        searchTree([convertToTreeData({ name: 'Alice' })], '"alice', { withQuotes: false })
+          .directMatches.size
+      ).toBe(0);
+    });
+
+    it('highlights a match inside a quoted key and value', async () => {
+      const { container } = render(
+        <JsonTree
+          data={{ name: 'Alice' }}
+          defaultExpanded
+          withKeyQuotes
+          withSearch
+          searchQuery="li"
+          searchDebounce={0}
+        />
+      );
+      await waitFor(() => expect(container.querySelectorAll('.searchHighlight')).toHaveLength(1));
+      expect(container.querySelector('.value')).toHaveTextContent('"Alice"');
+      expect(container.querySelector('[data-key="name"]')).toHaveTextContent('"name"');
+    });
+
+    it('copies valid JSON whatever the display style', async () => {
+      const { writeText, restore } = stubClipboard();
+      restoreClipboardAfter = restore;
+      const { container } = render(
+        <JsonTree
+          data={{ name: 'Alice' }}
+          defaultExpanded
+          withCopyAll
+          withQuotes={false}
+          withKeyQuotes
+        />
+      );
+      fireEvent.click(container.querySelector('.copyAllButton')!);
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('{\n  "name": "Alice"\n}'));
+    });
+  });
 });
 
 describe('Containers with nothing to show', () => {
