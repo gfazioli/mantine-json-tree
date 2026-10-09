@@ -9,8 +9,12 @@ import {
   convertToTreeData,
   filterTreeBySearch,
   getArrayGroupSize,
+  appendDraftRow,
+  applyRemap,
+  getDefaultNewValue,
   getTypeLabel,
   limitTreeEntries,
+  remapContainerEntries,
   searchTree,
   stringifyValue,
 } from './lib/utils';
@@ -1781,6 +1785,546 @@ describe('maxDisplayLength', () => {
     expect(Array.from(paths)).toEqual(['root', 'root.k0', 'root.k1']);
     await userEvent.click(moreButton(container)!);
     expect(onNodeClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('structural edits', () => {
+  /** Feeds every change back, as a real consumer would */
+  function Controlled({
+    initial,
+    onChange,
+    ...props
+  }: { initial: unknown; onChange?: jest.Mock } & Record<string, any>) {
+    const [data, setData] = React.useState(initial);
+    return (
+      <JsonTree
+        data={data}
+        editable
+        structuralEdits
+        defaultExpanded
+        maxDepth={-1}
+        onChange={(next, change) => {
+          setData(next);
+          onChange?.(next, change);
+        }}
+        {...props}
+      />
+    );
+  }
+
+  const row = (container: HTMLElement, path: string) =>
+    Array.from(container.querySelectorAll<HTMLElement>('li[role="treeitem"]')).find(
+      (li) => li.getAttribute('data-value') === path
+    );
+  /** The row's own control, never one of a nested row */
+  const own = (container: HTMLElement, path: string, selector: string) => {
+    const li = row(container, path)!;
+    return Array.from(li.querySelectorAll<HTMLElement>(selector)).find(
+      (el) => el.closest('[role="treeitem"]') === li
+    );
+  };
+  const action = (container: HTMLElement, path: string, name: string) =>
+    own(container, path, `[data-json-tree-action="${name}"]`);
+  const keyOf = (container: HTMLElement, path: string) => own(container, path, '.key')!;
+  const input = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input')!;
+
+  const profile = {
+    name: 'Ada',
+    age: 36,
+    tags: ['math', 'poetry', 'engines'],
+    address: { city: 'London', zip: 'W1' },
+  };
+
+  it('is off unless both editable and structuralEdits are set', () => {
+    const { container: a } = render(
+      <JsonTree data={profile} editable defaultExpanded maxDepth={-1} onChange={() => {}} />
+    );
+    expect(a.querySelector('[data-json-tree-action]')).toBeNull();
+    expect(a.querySelector('[data-renamable]')).toBeNull();
+
+    const { container: b } = render(
+      <JsonTree data={profile} structuralEdits defaultExpanded maxDepth={-1} />
+    );
+    expect(b.querySelector('[data-json-tree-action]')).toBeNull();
+  });
+
+  it('offers only the edits it is given', () => {
+    const { container } = render(<Controlled initial={profile} structuralEdits={['remove']} />);
+    const actions = new Set(
+      Array.from(container.querySelectorAll('[data-json-tree-action]')).map((el) =>
+        el.getAttribute('data-json-tree-action')
+      )
+    );
+    expect(Array.from(actions)).toEqual(['remove']);
+    expect(container.querySelector('[data-renamable]')).toBeNull();
+  });
+
+  it('puts each control only where it makes sense', () => {
+    const { container } = render(<Controlled initial={profile} />);
+    // the root can be added to, never renamed, removed or moved
+    expect(action(container, 'root', 'add')).toBeDefined();
+    expect(action(container, 'root', 'remove')).toBeUndefined();
+    // an object key can be renamed and removed, not moved
+    expect(own(container, 'root.name', '[data-renamable]')).toBeDefined();
+    expect(action(container, 'root.name', 'move-up')).toBeUndefined();
+    // an array item can be moved and removed, not renamed
+    expect(action(container, 'root.tags.1', 'move-up')).toBeDefined();
+    expect(own(container, 'root.tags.1', '[data-renamable]')).toBeUndefined();
+    // the ends of an array cannot move past them
+    expect(action(container, 'root.tags.0', 'move-up')).toBeDisabled();
+    expect(action(container, 'root.tags.2', 'move-down')).toBeDisabled();
+    // a primitive has nothing to add to
+    expect(action(container, 'root.name', 'add')).toBeUndefined();
+  });
+
+  it('never offers an edit where the data cannot be written', () => {
+    const { container } = render(
+      <Controlled
+        initial={{ m: new Map([['k', { a: 1 }]]), when: new Date(0), list: [1, 2, 3] }}
+        groupArraysAfterLength={2}
+      />
+    );
+    // Map entries have no address; a Date is not a container; a group is not data
+    expect(row(container, 'root.m.[0] k')!.querySelector('[data-json-tree-action]')).toBeNull();
+    expect(action(container, 'root.when', 'add')).toBeUndefined();
+    expect(action(container, 'root.list.[0…1]', 'remove')).toBeUndefined();
+    expect(action(container, 'root.m', 'add')).toBeUndefined();
+  });
+
+  it('respects isEditable for structural edits too', () => {
+    const { container } = render(
+      <Controlled
+        initial={profile}
+        isEditable={({ key }: JsonTreeNodePayload) => key !== 'address'}
+      />
+    );
+    expect(action(container, 'root.address', 'remove')).toBeUndefined();
+    expect(own(container, 'root.address', '[data-renamable]')).toBeUndefined();
+    expect(action(container, 'root.age', 'remove')).toBeDefined();
+  });
+
+  describe('rename', () => {
+    it('renames a key in place and reports it', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+
+      await user.click(keyOf(container, 'root.name'));
+      expect(input(container).value).toBe('name');
+      expect(input(container)).toHaveAttribute('aria-label', 'Rename name');
+      await user.clear(input(container));
+      await user.type(input(container), 'fullName{Enter}');
+
+      const [next, change] = onChange.mock.calls[0];
+      expect(Object.keys(next)).toEqual(['fullName', 'age', 'tags', 'address']);
+      expect(change).toMatchObject({
+        action: 'rename',
+        path: 'root.fullName',
+        pathSegments: ['fullName'],
+        key: 'fullName',
+        value: 'Ada',
+        previousValue: 'Ada',
+        previousPath: 'root.name',
+        previousPathSegments: ['name'],
+        previousKey: 'name',
+      });
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.fullName')));
+    });
+
+    it('rejects a key that already exists, and one validateKey refuses', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container, getByText } = render(
+        <Controlled
+          initial={profile}
+          onChange={onChange}
+          validateKey={(key: string) => (key.startsWith('_') ? 'No private keys' : null)}
+        />
+      );
+
+      await user.click(keyOf(container, 'root.name'));
+      await user.clear(input(container));
+      await user.type(input(container), 'age{Enter}');
+      expect(getByText('Key already exists')).toBeInTheDocument();
+
+      await user.clear(input(container));
+      await user.type(input(container), '_secret{Enter}');
+      expect(getByText('No private keys')).toBeInTheDocument();
+      expect(onChange).not.toHaveBeenCalled();
+
+      await user.keyboard('{Escape}');
+      expect(container.querySelector('input')).toBeNull();
+      expect(document.activeElement).toBe(row(container, 'root.name'));
+    });
+
+    it('keeps the expanded nodes below a renamed key open', async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <Controlled initial={{ user: { address: { city: 'Rome' } } }} />
+      );
+      expect(container.textContent).toContain('"Rome"');
+
+      await user.click(keyOf(container, 'root.user'));
+      await user.clear(input(container));
+      await user.type(input(container), 'person{Enter}');
+
+      expect(row(container, 'root.person.address')).toBeDefined();
+      expect(container.textContent).toContain('"Rome"');
+    });
+
+    it('renames from the keyboard with F2', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+      row(container, 'root.age')!.focus();
+      await user.keyboard('{F2}');
+      await user.clear(input(container));
+      await user.type(input(container), 'years{Enter}');
+      expect(onChange.mock.calls[0][1]).toMatchObject({ action: 'rename', key: 'years' });
+    });
+
+    it('reports nothing when the key is unchanged', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+      await user.click(keyOf(container, 'root.name'));
+      await user.keyboard('{Enter}');
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('add', () => {
+    it('adds a key to an object and opens the editor on its value', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+
+      await user.click(action(container, 'root.address', 'add')!);
+      expect(input(container)).toHaveAttribute('aria-label', 'New key');
+      await user.type(input(container), 'country{Enter}');
+
+      const [next, change] = onChange.mock.calls[0];
+      expect(next.address).toEqual({ city: 'London', zip: 'W1', country: '' });
+      expect(change).toMatchObject({
+        action: 'add',
+        path: 'root.address.country',
+        pathSegments: ['address', 'country'],
+        key: 'country',
+        type: 'string',
+        value: '',
+        previousValue: undefined,
+      });
+
+      // the new string's editor is open straight away
+      await waitFor(() => expect(input(container)).toHaveAttribute('aria-label', 'Edit country'));
+      await user.type(input(container), 'UK{Enter}');
+      expect(onChange.mock.calls[1][0].address.country).toBe('UK');
+      await waitFor(() =>
+        expect(document.activeElement).toBe(row(container, 'root.address.country'))
+      );
+    });
+
+    it('rejects a key the object already has', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container, getByText } = render(<Controlled initial={profile} onChange={onChange} />);
+      await user.click(action(container, 'root.address', 'add')!);
+      await user.type(input(container), 'city{Enter}');
+      expect(getByText('Key already exists')).toBeInTheDocument();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('cancels with Escape and gives focus back to the container', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+      row(container, 'root.address')!.focus();
+      await user.keyboard('{Insert}');
+      expect(input(container)).toHaveAttribute('aria-label', 'New key');
+      await user.keyboard('{Escape}');
+      expect(container.querySelector('input')).toBeNull();
+      expect(onChange).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(row(container, 'root.address'));
+    });
+
+    it('adds to an empty object, opening it', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={{ empty: {} }} onChange={onChange} />);
+      await user.click(action(container, 'root.empty', 'add')!);
+      await user.type(input(container), 'first{Enter}');
+      expect(onChange.mock.calls[0][0]).toEqual({ empty: { first: '' } });
+      expect(row(container, 'root.empty.first')).toBeDefined();
+    });
+
+    it('appends an item of the same type as the last one', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(
+        <Controlled
+          initial={{ nums: [1, 2], flags: [true], rows: [{ a: 1 }] }}
+          onChange={onChange}
+        />
+      );
+
+      await user.click(action(container, 'root.nums', 'add')!);
+      expect(onChange.mock.calls[0][0].nums).toEqual([1, 2, 0]);
+      expect(onChange.mock.calls[0][1]).toMatchObject({
+        action: 'add',
+        path: 'root.nums.2',
+        pathSegments: ['nums', 2],
+        key: '2',
+        type: 'number',
+      });
+      // a number opens its editor
+      await waitFor(() => expect(input(container)).toHaveAttribute('aria-label', 'Edit 2'));
+      await user.keyboard('{Escape}');
+
+      await user.click(action(container, 'root.flags', 'add')!);
+      expect(onChange.mock.calls[1][0].flags).toEqual([true, false]);
+      await user.click(action(container, 'root.rows', 'add')!);
+      expect(onChange.mock.calls[2][0].rows).toEqual([{ a: 1 }, {}]);
+      // a boolean or an object has no editor to open: its row takes focus
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.rows.1')));
+    });
+
+    it('starts from getNewValue when it is given', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const getNewValue = jest.fn(() => null);
+      const { container } = render(
+        <Controlled initial={{ list: ['a'] }} onChange={onChange} getNewValue={getNewValue} />
+      );
+      await user.click(action(container, 'root.list', 'add')!);
+      expect(getNewValue).toHaveBeenCalledWith(
+        expect.objectContaining({ path: 'root.list', pathSegments: ['list'], value: ['a'] })
+      );
+      expect(onChange.mock.calls[0][0]).toEqual({ list: ['a', null] });
+    });
+
+    it('reveals a new item past maxDisplayLength', async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <Controlled initial={{ list: [1, 2, 3] }} maxDisplayLength={2} getNewValue={() => 9} />
+      );
+      await user.click(action(container, 'root.list', 'add')!);
+      await user.keyboard('{Escape}');
+      expect(row(container, 'root.list.3')).toBeDefined();
+    });
+  });
+
+  describe('remove', () => {
+    it('removes a key and focuses the next one', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+
+      await user.click(action(container, 'root.age', 'remove')!);
+      const [next, change] = onChange.mock.calls[0];
+      expect(next).toEqual({ name: 'Ada', tags: profile.tags, address: profile.address });
+      expect(change).toMatchObject({
+        action: 'remove',
+        path: 'root.age',
+        pathSegments: ['age'],
+        key: 'age',
+        type: 'number',
+        value: undefined,
+        previousValue: 36,
+      });
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.tags')));
+    });
+
+    it('removes an array item, shifting the rest and their expanded state', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(
+        <Controlled
+          initial={{ list: [{ id: 1 }, { id: 2, deep: { x: 'X' } }] }}
+          onChange={onChange}
+        />
+      );
+      expect(container.textContent).toContain('"X"');
+
+      await user.click(action(container, 'root.list.0', 'remove')!);
+      expect(onChange.mock.calls[0][0]).toEqual({ list: [{ id: 2, deep: { x: 'X' } }] });
+      // the second item is now the first, still open down to its leaves
+      expect(container.textContent).toContain('"X"');
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list.0')));
+    });
+
+    it('removes the last entry and focuses the one before, then the container', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Controlled initial={{ list: ['a', 'b'] }} />);
+      await user.click(action(container, 'root.list', 'add')!);
+      await user.keyboard('{Escape}');
+      row(container, 'root.list.2')!.focus();
+      await user.keyboard('{Delete}');
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list.1')));
+      await user.keyboard('{Backspace}');
+      await user.keyboard('{Backspace}');
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list')));
+    });
+  });
+
+  describe('reorder', () => {
+    it('moves an item with its buttons and reports where it went', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+
+      await user.click(action(container, 'root.tags.0', 'move-down')!);
+      const [next, change] = onChange.mock.calls[0];
+      expect(next.tags).toEqual(['poetry', 'math', 'engines']);
+      expect(change).toMatchObject({
+        action: 'reorder',
+        path: 'root.tags.1',
+        pathSegments: ['tags', 1],
+        key: '1',
+        value: 'math',
+        previousPath: 'root.tags.0',
+        previousPathSegments: ['tags', 0],
+        previousKey: '0',
+      });
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.tags.1')));
+    });
+
+    it('moves with Alt + arrows, carrying the expanded state along', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(
+        <Controlled initial={{ list: ['a', { inner: { leaf: 'L' } }] }} onChange={onChange} />
+      );
+      row(container, 'root.list.1')!.focus();
+      await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+      expect(onChange.mock.calls[0][0]).toEqual({ list: [{ inner: { leaf: 'L' } }, 'a'] });
+      expect(container.textContent).toContain('"L"');
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list.0')));
+
+      // the first item cannot move up: nothing happens, focus stays
+      await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(row(container, 'root.list.0'));
+    });
+
+    it('moves an item across the groups of a grouped array, opening its group', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      const { container } = render(
+        <Controlled
+          initial={{ list: ['a', 'b', 'c'] }}
+          onChange={onChange}
+          groupArraysAfterLength={2}
+          maxDepth={2}
+        />
+      );
+      // only the first group is open
+      fireEvent.click(own(container, 'root.list.[0…1]', '.expandCollapse')!);
+      await user.click(action(container, 'root.list.1', 'move-down')!);
+      expect(onChange.mock.calls[0][0].list).toEqual(['a', 'c', 'b']);
+      await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list.2')));
+    });
+  });
+
+  it('reports a value edit as action "edit"', async () => {
+    const user = userEvent.setup();
+    const onChange = jest.fn();
+    const { container } = render(<Controlled initial={profile} onChange={onChange} />);
+    await user.click(own(container, 'root.name', '[data-edit-key]')!);
+    await user.clear(input(container));
+    await user.type(input(container), 'Lovelace{Enter}');
+    expect(onChange.mock.calls[0][1]).toMatchObject({ action: 'edit', value: 'Lovelace' });
+  });
+
+  it('reports remapped expansion through onExpandedChange when controlled', async () => {
+    const user = userEvent.setup();
+    const onExpandedChange = jest.fn();
+    const { container } = render(
+      <Controlled
+        initial={{ a: { b: { c: 1 } } }}
+        expanded={['root', 'root.a', 'root.a.b']}
+        onExpandedChange={onExpandedChange}
+      />
+    );
+    await user.click(keyOf(container, 'root.a'));
+    await user.clear(input(container));
+    await user.type(input(container), 'z{Enter}');
+    expect(onExpandedChange).toHaveBeenLastCalledWith(
+      expect.arrayContaining(['root', 'root.z', 'root.z.b'])
+    );
+    expect(onExpandedChange.mock.calls.at(-1)[0]).not.toContain('root.a');
+  });
+
+  it('never confuses a dotted key with a nested one when remapping', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Controlled initial={{ a: { b: { deep: 1 } }, 'a.b': { other: 2 } }} />
+    );
+    await user.click(keyOf(container, 'root.a'));
+    await user.clear(input(container));
+    await user.type(input(container), 'z{Enter}');
+    // 'a.b' kept its own expansion; 'z' took 'a''s
+    expect(container.textContent).toContain('other');
+    expect(container.textContent).toContain('deep');
+  });
+});
+
+describe('structural edit helpers', () => {
+  const tree = (value: unknown) => [convertToTreeData(value)];
+
+  it('remaps every value below a renamed entry, and nothing else', () => {
+    const remap = remapContainerEntries(tree({ a: { b: { c: 1 } }, x: 1 }), 'root', (k) =>
+      k === 'a' ? 'z' : k
+    );
+    expect(Object.fromEntries(remap.moves)).toEqual({
+      'root.a': 'root.z',
+      'root.a.b': 'root.z.b',
+      'root.a.b.c': 'root.z.b.c',
+    });
+    expect(
+      applyRemap({ root: true, 'root.a': true, 'root.a.b': false, 'root.x': true }, remap)
+    ).toEqual({ root: true, 'root.z': true, 'root.z.b': false, 'root.x': true });
+  });
+
+  it('drops a removed entry and shifts the indices after it', () => {
+    const remap = remapContainerEntries(tree(['a', ['b'], ['c']]), 'root', (k) =>
+      k === '0' ? null : String(Number(k) - 1)
+    );
+    expect(applyRemap({ 'root.0': true, 'root.1': true, 'root.2': false }, remap)).toEqual({
+      'root.0': true,
+      'root.1': false,
+    });
+  });
+
+  it('keeps a value an unmoved node shares with a moved one', () => {
+    const remap = remapContainerEntries(
+      tree({ a: { b: { x: 1 } }, 'a.b': { y: 2 } }),
+      'root',
+      (k) => (k === 'a' ? 'z' : k)
+    );
+    expect(remap.keep.has('root.a.b')).toBe(true);
+    expect(applyRemap({ 'root.a': true, 'root.a.b': true }, remap)).toEqual({
+      'root.a.b': true,
+      'root.z': true,
+      'root.z.b': true,
+    });
+  });
+
+  it('starts a new entry with the last entry type, emptied', () => {
+    expect(getDefaultNewValue([])).toBe('');
+    expect(getDefaultNewValue(['a'])).toBe('');
+    expect(getDefaultNewValue([1])).toBe(0);
+    expect(getDefaultNewValue([true])).toBe(false);
+    expect(getDefaultNewValue([null])).toBeNull();
+    expect(getDefaultNewValue([[1]])).toEqual([]);
+    expect(getDefaultNewValue({ a: { b: 1 } })).toEqual({});
+    expect(getDefaultNewValue([new Date()])).toBe('');
+  });
+
+  it('appends the new-key row to the right container only', () => {
+    const [root] = appendDraftRow(tree({ a: { x: 1 }, b: { y: 2 } }), 'root.b');
+    const [a, b] = root.children as any[];
+    expect(a.children).toHaveLength(1);
+    expect(b.children.at(-1).nodeData.draft).toEqual({ container: 'root.b' });
   });
 });
 
