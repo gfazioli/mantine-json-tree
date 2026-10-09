@@ -624,6 +624,12 @@ function rowControl(row: Element | null | undefined, selector: string) {
   return row?.querySelector<HTMLElement>(`:scope > [data-json-tree-row] ${selector}`) ?? null;
 }
 
+/** A row to focus: its tree value, and its address when known, since tree values can collide */
+interface FocusTarget {
+  value: string;
+  segments?: JsonTreePathSegments;
+}
+
 /** Which structural edits a row offers; `parentLength` is set for an array item */
 interface StructureCaps {
   rename: boolean;
@@ -1069,6 +1075,7 @@ function renderJSONNode(
         {...elementProps}
         onClick={handleClick}
         data-json-tree-row
+        data-json-tree-address={editKey ?? undefined}
         data-json-tree-highlight={highlight}
         style={{
           cursor: onNodeClick ? 'pointer' : 'default',
@@ -1207,6 +1214,7 @@ function renderJSONNode(
       {...elementProps}
       onClick={handleClick}
       data-json-tree-row
+      data-json-tree-address={editKey ?? undefined}
       data-json-tree-highlight={highlight}
       data-expanded={expanded}
       data-has-children={hasChildren}
@@ -1530,25 +1538,37 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const [revealed, setRevealed] = useState<Record<string, number>>({});
   const displayLimit = toLimit(maxDisplayLength);
 
-  /** The rendered row of a tree value, if any */
-  const findRow = useCallback(
-    (path: string) =>
-      Array.from(rootRef.current?.querySelectorAll<HTMLElement>('li[role="treeitem"]') ?? []).find(
-        (li) => li.getAttribute('data-value') === path
-      ),
-    []
-  );
+  /**
+   * The rendered row of a target. Tree values can collide (`{ 'a.b' }` and
+   * `{ a: { b } }`), so when the target knows its address and editing has put
+   * addresses on the rows, the address decides.
+   */
+  const findRow = useCallback((target: FocusTarget) => {
+    const rows = Array.from(
+      rootRef.current?.querySelectorAll<HTMLElement>('li[role="treeitem"]') ?? []
+    ).filter((li) => li.getAttribute('data-value') === target.value);
+    const address = target.segments && JSON.stringify(target.segments);
+    return (
+      rows.find(
+        (li) =>
+          address !== undefined &&
+          li
+            .querySelector(':scope > [data-json-tree-row]')
+            ?.getAttribute('data-json-tree-address') === address
+      ) ?? rows[0]
+    );
+  }, []);
 
   const focusElement = (row: HTMLElement) => {
     row.setAttribute('data-focus-ring', 'true');
     row.focus();
   };
 
-  /** Focus the first of these rows (tree values) that is rendered */
+  /** Focus the first of these rows that is rendered */
   const focusRow = useCallback(
-    (paths: string[]) => {
-      for (const path of paths) {
-        const row = findRow(path);
+    (targets: FocusTarget[]) => {
+      for (const target of targets) {
+        const row = findRow(target);
         if (row) {
           focusElement(row);
           return;
@@ -1561,7 +1581,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Rows to focus once the tree has re-rendered: the first entry a "more" row
   // revealed, the row that took the place of a removed one, a moved item…
   // Without it focus falls to the body when the row it was on goes away.
-  const [pendingFocus, setPendingFocus] = useState<string[] | null>(null);
+  const [pendingFocus, setPendingFocus] = useState<FocusTarget[] | null>(null);
 
   // The one inline editor open, if any: a value, a key being renamed (both by
   // serialized segments), or a new key being added to an object (by tree value).
@@ -1579,7 +1599,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // exist yet (a key just added). When the editor unmounts its input goes with
   // it and focus falls to the body, which drops a keyboard user out of the tree
   // entirely — arrow navigation stops working until they tab back in.
-  const editingRowRef = useRef<HTMLElement | string | null>(null);
+  const editingRowRef = useRef<HTMLElement | FocusTarget | null>(null);
 
   const handleStartEdit = useCallback((key: string, row: HTMLElement | null) => {
     editingRowRef.current = row;
@@ -1595,10 +1615,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
     const row = editingRowRef.current;
     editingRowRef.current = null;
-    if (typeof row === 'string') {
+    if (row instanceof HTMLElement) {
+      if (row.isConnected) {
+        row.focus();
+      }
+    } else if (row) {
       focusRow([row]);
-    } else if (row?.isConnected) {
-      row.focus();
     }
   }, [editorOpen, focusRow]);
 
@@ -1774,7 +1796,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       remap?: TreeRemap;
       expand?: (string | null)[];
       reveal?: { container: string; count: number };
-      focus?: string[];
+      focus?: FocusTarget[];
     }
   ) => {
     const toExpand = expand.filter((value): value is string => value !== null);
@@ -1800,6 +1822,12 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     }
   };
 
+  /** A node's address once it sits under `key` of the same container */
+  const relocatedTo = (payload: JsonTreeNodePayload, key: string | number) => [
+    ...payload.pathSegments.slice(0, -1),
+    key,
+  ];
+
   /** A node's payload once it sits under `key` of the same container */
   const relocated = (
     payload: JsonTreeNodePayload,
@@ -1810,7 +1838,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     ...payload,
     action,
     path: childTreeValue(parent, key),
-    pathSegments: [...payload.pathSegments.slice(0, -1), key],
+    pathSegments: relocatedTo(payload, key),
     key: String(key),
     previousValue: payload.value,
     previousPath: payload.path,
@@ -1833,12 +1861,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   /** Open the value editor on a node that was just added, or focus it */
   const editOrFocusNew = (treeValue: string, payload: JsonTreeNodePayload) => {
+    const target = { value: treeValue, segments: payload.pathSegments };
     // a boolean toggles on click and an object has no value to type: focus them
     if ((payload.type === 'string' || payload.type === 'number') && isPayloadEditable(payload)) {
-      editingRowRef.current = treeValue;
+      editingRowRef.current = target;
       setEditor({ kind: 'value', key: JSON.stringify(payload.pathSegments) });
     } else {
-      setPendingFocus([treeValue]);
+      setPendingFocus([target]);
     }
   };
 
@@ -1900,7 +1929,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         remap: parentNode
           ? remapContainerEntries(treeData, parentNode, (k) => (k === key ? nextKey : k))
           : undefined,
-        focus: [childTreeValue(parent, nextKey)],
+        focus: [
+          { value: childTreeValue(parent, nextKey), segments: relocatedTo(payload, nextKey) },
+        ],
       }
     );
   };
@@ -1998,11 +2029,23 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     // one before it, else the container
     const entries = parentNode ? getContainerEntries(parentNode) : [];
     const at = entries.findIndex((entry) => entry.value === node.value);
-    const after = (entry: JSONTreeNodeData | undefined) =>
-      entry ? (remap.moves.has(entry.value) ? remap.moves.get(entry.value) : entry.value) : null;
-    const focus = [after(entries[at + 1]), after(entries[at - 1]), parent].filter(
-      (value): value is string => Boolean(value)
-    );
+    const parentSegments = payload.pathSegments.slice(0, -1);
+    const after = (entry: JSONTreeNodeData | undefined): FocusTarget | null => {
+      const value =
+        entry && (remap.moves.has(entry.value) ? remap.moves.get(entry.value) : entry.value);
+      const step = entry?.nodeData?.pathSegments?.at(-1);
+      if (!value || step === undefined) {
+        return null;
+      }
+      // an array item after the removed one moved up one index
+      const shifted = typeof step === 'number' && typeof last === 'number' && step > last;
+      return { value, segments: [...parentSegments, shifted ? step - 1 : step] };
+    };
+    const focus = [
+      after(entries[at + 1]),
+      after(entries[at - 1]),
+      { value: parent, segments: parentSegments },
+    ].filter((target): target is FocusTarget => target !== null);
 
     commitStructuralChange(
       removeAtPath(data, payload.pathSegments),
@@ -2034,7 +2077,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
             )
           : undefined,
         expand: [groupValue(parent, to, length)],
-        focus: [childTreeValue(parent, to)],
+        focus: [{ value: childTreeValue(parent, to), segments: relocatedTo(payload, to) }],
       }
     );
   };
@@ -2192,7 +2235,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         ...current,
         [more.container]: (current[more.container] ?? displayLimit) + displayLimit,
       }));
-      setPendingFocus([more.next]);
+      setPendingFocus([{ value: more.next }]);
     },
     [displayLimit]
   );
@@ -2311,7 +2354,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     [allExpanded, displayedTreeData]
   );
   const focusParentRow = (value: string) => {
-    const parent = findRow(value)?.parentElement?.closest<HTMLElement>('[role="treeitem"]');
+    // Mantine asks from the focused row's own key handler: start from that row,
+    // which a lookup by tree value could confuse with another sharing it
+    const focused = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(
+      'li[role="treeitem"]'
+    );
+    const row = focused?.getAttribute('data-value') === value ? focused : findRow({ value });
+    const parent = row?.parentElement?.closest<HTMLElement>('[role="treeitem"]');
     if (parent) {
       focusElement(parent);
     }

@@ -1621,6 +1621,19 @@ describe('allExpanded', () => {
     expect(document.activeElement).toBe(row(container, 'root.user.name'));
   });
 
+  it('moves to the real parent on ArrowLeft when another row shares the path', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <JsonTree data={{ 'a.b': { x: 1 }, a: { b: { y: 2 } } }} allExpanded />
+    );
+    const [, nested] = Array.from(
+      container.querySelectorAll<HTMLElement>('li[role="treeitem"][data-value="root.a.b"]')
+    );
+    nested.focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(document.activeElement).toBe(row(container, 'root.a'));
+  });
+
   it('ignores a controlled expanded, with a warning, and never reports a change', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const onExpandedChange = jest.fn();
@@ -1978,6 +1991,21 @@ describe('structural edits', () => {
 
       expect(row(container, 'root.person.address')).toBeDefined();
       expect(container.textContent).toContain('"Rome"');
+    });
+
+    it('focuses the renamed row, not another row sharing its path', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Controlled initial={{ 'a.b': 1, a: { c: 2 } }} />);
+      await user.click(keyOf(container, 'root.a.c'));
+      await user.clear(input(container));
+      await user.type(input(container), 'b{Enter}');
+      // two rows now read root.a.b: the dotted key, and the renamed one under a
+      await waitFor(() =>
+        expect(
+          (document.activeElement as HTMLElement).parentElement!.closest('li[role="treeitem"]')
+        ).toBe(row(container, 'root.a'))
+      );
+      expect(document.activeElement).toHaveAttribute('data-value', 'root.a.b');
     });
 
     it('renames from the keyboard with F2', async () => {
