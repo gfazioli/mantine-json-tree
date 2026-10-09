@@ -1552,6 +1552,93 @@ describe('JsonTree display options', () => {
   });
 });
 
+describe('allExpanded', () => {
+  const data = {
+    user: { name: 'Alice', address: { city: 'Rome' } },
+    list: [1, 2, 3, 4, 5],
+    text: 'abcdefghij',
+  };
+  const row = (container: HTMLElement, path: string) =>
+    container.querySelector<HTMLElement>(`li[role="treeitem"][data-value="${path}"]`)!;
+
+  it('expands every node, array groups included, whatever defaultExpanded and maxDepth say', () => {
+    const { container } = render(
+      <JsonTree data={data} allExpanded maxDepth={0} groupArraysAfterLength={2} />
+    );
+    expect(container.textContent).toContain('"Rome"');
+    expect(container.textContent).toContain('[4…4]');
+    expect(container.textContent).toContain('5');
+    const parents = container.querySelectorAll('[data-has-children="true"]');
+    expect(parents).toHaveLength(7); // root, user, address, list, three groups
+    parents.forEach((el) => expect(el).toHaveAttribute('data-expanded', 'true'));
+  });
+
+  it('hides the node toggles and the expand/collapse all controls', () => {
+    const { container } = render(<JsonTree data={data} allExpanded withExpandAll title="Data" />);
+    expect(container.querySelector('.expandCollapse')).toBeNull();
+    expect(container.querySelector('.controls')).toBeNull();
+    expect(container.querySelector('[data-all-expanded]')).not.toBeNull();
+  });
+
+  it('keeps the toggles when it is off', () => {
+    const { container } = render(<JsonTree data={data} withExpandAll />);
+    expect(container.querySelector('.expandCollapse')).not.toBeNull();
+    expect(container.querySelectorAll('.controls')).toHaveLength(2);
+  });
+
+  it('cannot be collapsed from the keyboard; ArrowLeft moves to the parent', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<JsonTree data={data} allExpanded />);
+
+    const isOpen = (path: string) =>
+      row(container, path).querySelector('[data-has-children]')!.getAttribute('data-expanded');
+
+    row(container, 'root.user').focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(isOpen('root.user')).toBe('true');
+    expect(document.activeElement).toBe(row(container, 'root'));
+
+    row(container, 'root.user').focus();
+    await user.keyboard(' ');
+    expect(isOpen('root.user')).toBe('true');
+    expect(container.textContent).toContain('"Rome"');
+
+    // ArrowRight still walks into the children
+    await user.keyboard('{ArrowRight}');
+    expect(document.activeElement).toBe(row(container, 'root.user.name'));
+  });
+
+  it('ignores a controlled expanded, with a warning, and never reports a change', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const onExpandedChange = jest.fn();
+    const { container } = render(
+      <JsonTree
+        data={data}
+        allExpanded
+        expanded={[]}
+        onExpandedChange={onExpandedChange}
+        withSearch
+        searchQuery="Rome"
+        searchDebounce={0}
+      />
+    );
+    await waitFor(() => expect(container.querySelector('.searchHighlight')).not.toBeNull());
+    expect(container.textContent).toContain('"Rome"');
+    expect(onExpandedChange).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('`expanded` is ignored'));
+    warn.mockRestore();
+  });
+
+  it('leaves collapseStringsAfterLength working', async () => {
+    const { container, getByRole } = render(
+      <JsonTree data={data} allExpanded collapseStringsAfterLength={6} />
+    );
+    expect(container.textContent).toContain('"abcdef…"');
+    await userEvent.click(getByRole('button', { name: 'show more' }));
+    expect(container.textContent).toContain('"abcdefghij"');
+  });
+});
+
 describe('Containers with nothing to show', () => {
   const secret = function secretFn() {
     return 'SECRET';
