@@ -200,6 +200,15 @@ export interface JsonTreeBaseProps {
   /** Callback when expanded state changes */
   onExpandedChange?: (expanded: string[]) => void;
 
+  /**
+   * Expand every node, array groups included, and lock them open: the toggles
+   * and the expand/collapse all controls are hidden and the keyboard cannot
+   * collapse a node. `defaultExpanded`, `maxDepth` and a controlled `expanded`
+   * are ignored while it is on.
+   * @default false
+   */
+  allExpanded?: boolean;
+
   /** If set, the header is sticky @default `false` */
   stickyHeader?: boolean;
 
@@ -437,6 +446,7 @@ export const defaultProps: Partial<JsonTreeProps> = {
   showValueTypes: false,
   withQuotes: true,
   withKeyQuotes: false,
+  allExpanded: false,
 };
 
 /** Cut a string at `limit` characters without splitting a surrogate pair (an emoji, say) in two */
@@ -503,6 +513,8 @@ interface RenderNodeContext {
   onExpand?: (path: string) => void;
   onCollapse?: (path: string) => void;
   onExpandedChange?: (expanded: string[]) => void;
+  /** `allExpanded`: every node is open and none can be collapsed */
+  locked?: boolean;
   searchQuery?: string;
   matchedPaths?: Set<string>;
   directMatches?: Set<string>;
@@ -903,14 +915,16 @@ function renderJSONNode(
     >
       {lineNumber}
       {renderIndentGuides()}
-      <ActionIcon
-        size="xs"
-        variant="subtle"
-        onClick={handleToggleExpanded}
-        {...getStyles('expandCollapse')}
-      >
-        {expandCollapseIcon}
-      </ActionIcon>
+      {!ctx.locked && (
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          onClick={handleToggleExpanded}
+          {...getStyles('expandCollapse')}
+        >
+          {expandCollapseIcon}
+        </ActionIcon>
+      )}
 
       {displayKey !== undefined && (
         <>
@@ -1053,7 +1067,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     tooltipProps,
     maxHeight,
     expanded: controlledExpanded,
-    onExpandedChange,
+    onExpandedChange: _onExpandedChange,
+    allExpanded,
     stickyHeaderOffset,
     stickyHeader,
     displayFunctions,
@@ -1116,6 +1131,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   const responsiveClassName = useRandomClassName();
 
+  // A locked tree never reports an expansion change: nothing can change
+  const onExpandedChange = allExpanded ? undefined : _onExpandedChange;
+
   // Convert JSON data to Mantine Tree format
   const treeData = useMemo(
     () => [
@@ -1160,6 +1178,36 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const tree = useTree({
     initialExpandedState,
   });
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && allExpanded && controlledExpanded) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'JsonTree: `expanded` is ignored while `allExpanded` is set — every node is expanded and locked open.'
+      );
+    }
+  }, [allExpanded, controlledExpanded]);
+
+  // Every node open, array groups included. The controller handed to the Tree
+  // ignores expand and collapse, which is what keeps the keyboard (ArrowLeft,
+  // Space) from closing anything.
+  const lockedExpandedState = useMemo(
+    () => (allExpanded ? getTreeExpandedState(treeData, '*') : null),
+    [allExpanded, treeData]
+  );
+  const noop = () => {};
+  const treeController = lockedExpandedState
+    ? {
+        ...tree,
+        expandedState: lockedExpandedState,
+        expand: noop,
+        collapse: noop,
+        toggleExpanded: noop,
+        expandAllNodes: noop,
+        collapseAllNodes: noop,
+        setExpandedState: noop,
+      }
+    : tree;
 
   // Sync controlled expanded state
   useEffect(() => {
@@ -1373,6 +1421,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   // Auto-expand to show search results
   useEffect(() => {
+    if (allExpanded) {
+      return;
+    }
     if (debouncedQuery && searchResults.expandedPaths.length > 0) {
       if (!preSearchExpandedRef.current) {
         preSearchExpandedRef.current = { ...tree.expandedState };
@@ -1451,6 +1502,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     onExpand,
     onCollapse,
     onExpandedChange,
+    locked: allExpanded,
     searchQuery: debouncedQuery || undefined,
     matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
     directMatches: debouncedQuery ? searchResults.directMatches : undefined,
@@ -1466,13 +1518,37 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const treeComponent = (
     <Tree
       data={filteredTreeData}
-      tree={tree}
+      tree={treeController}
       levelOffset={32}
       renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
     />
   );
 
-  const showHeader = title || withExpandAll || withKeyCountBadge || withCopyAll || withSearch;
+  const showHeader =
+    title || (withExpandAll && !allExpanded) || withKeyCountBadge || withCopyAll || withSearch;
+
+  // Mantine's Tree turns ArrowLeft on an open node into a collapse, which a
+  // locked tree ignores; move to the parent instead, as on a leaf.
+  const handleLockedKeyDownCapture = (event: React.KeyboardEvent) => {
+    if (!allExpanded || event.nativeEvent.code !== 'ArrowLeft') {
+      return;
+    }
+    const row = event.target as HTMLElement;
+    // an open node is one whose subtree is rendered (Mantine 9.7.0 sets no aria-expanded)
+    const isOpenNode =
+      row.getAttribute?.('role') === 'treeitem' &&
+      Array.from(row.children).some((child) => child.getAttribute('role') === 'group');
+    if (!isOpenNode) {
+      return;
+    }
+    const parent = row.parentElement?.closest<HTMLElement>('[role="treeitem"]');
+    event.preventDefault();
+    event.stopPropagation();
+    if (parent) {
+      parent.setAttribute('data-focus-ring', 'true');
+      parent.focus();
+    }
+  };
 
   const content = (
     <>
@@ -1482,7 +1558,9 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
         {...others}
         data-line-numbers={showLineNumbers || undefined}
         data-searching={debouncedQuery ? true : undefined}
+        data-all-expanded={allExpanded || undefined}
         onKeyDown={handleKeyDown}
+        onKeyDownCapture={allExpanded ? handleLockedKeyDownCapture : undefined}
       >
         {showHeader && (
           <Group {...getStyles('header')} justify="space-between" mod={{ sticky: stickyHeader }}>
@@ -1516,7 +1594,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                 </ActionIcon>
               )}
 
-              {withExpandAll && isExpandable(data) && (
+              {withExpandAll && !allExpanded && isExpandable(data) && (
                 <>
                   <ActionIcon
                     size="sm"
