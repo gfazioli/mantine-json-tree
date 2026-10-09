@@ -25,6 +25,13 @@ function Demo() {
         withKeyCountBadge
         defaultExpanded
       />
+      <JsonTree
+        data={{ id: 1, name: 'Alice', role: 'admin' }}
+        rootName={false}
+        title="No Root Label"
+        withBorder
+        defaultExpanded
+      />
     </Stack>
   );
 }
@@ -47,6 +54,13 @@ function Demo() {
         title="Array Root Name"
         withBorder
         withKeyCountBadge
+        defaultExpanded
+      />
+      <JsonTree
+        data={{ id: 1, name: 'Alice', role: 'admin' }}
+        rootName={false}
+        title="No Root Label"
+        withBorder
         defaultExpanded
       />
     </Stack>

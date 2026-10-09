@@ -106,7 +106,13 @@ The `varsResolver` maps props to CSS variables across multiple style targets:
 `root`, `paper`, `header`, `toolbar`, `controls`, `expandCollapse`, `keyCountBadge`, `copyAllButton`, `searchToggle`, `searchBar`, `searchInput`, `searchHighlight`, `key`, `keyValueSeparator`, `value`, `bracket`, `ellipsis`, `itemsCount`, `indentGuide`, `copyButton`, `lineNumber`, `valueEditor`, `typeBadge`, `showMore`, `moreItems`, `keyEditor`, `addButton`, `removeButton`, `moveButton`. The `.value` selector uses `data-type` attribute to apply type-specific colors via CSS.
 
 ### Indent guides
-When `showIndentGuides` is enabled, absolutely-positioned `<div>` elements are rendered for each depth level with cycling colors (5-color palette via `data-color-index`). Guide position: `left = depth * 32 + 8px` (matching Mantine Tree's `levelOffset={32}`).
+When `showIndentGuides` is enabled, absolutely-positioned `<div>` elements are rendered for each depth level with cycling colors (5-color palette via `data-color-index`). Guide position: `left = depth * indentWidth + 8px`, matching the Tree's `levelOffset={indentWidth}` (32 by default).
+
+### Labels
+Every built-in string comes from `labels` (`JsonTreeLabels`, merged over `DEFAULT_LABELS` in the component and handed to `renderJSONNode` through `ctx.labels`). A new string, button or editor message must go there too, and every icon button takes its `aria-label` from it; `JsonTreeValueEditor` gets its name (`ariaLabel`) and `messages` from the caller.
+
+### rootName={false}
+The root gets no key (so no key cell), but the path prefix stays `root`: `convertToTreeData(data, undefined, 'root', …)`.
 
 ### Copy to clipboard
 The `withCopyToClipboard` prop adds per-node copy buttons that `JSON.stringify(value, null, 2)` to clipboard. Buttons use opacity transition (hidden until `.root:hover`).
