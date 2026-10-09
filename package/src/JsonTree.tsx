@@ -48,6 +48,7 @@ import {
   convertToTreeData,
   filterTreeBySearch,
   findNodeByPath,
+  formatKey,
   formatValue,
   getItemCount,
   getTypeLabel,
@@ -247,6 +248,12 @@ export interface JsonTreeBaseProps {
   /** Whether to show a type badge (`string`, `int`, `float`, `bool`, `object`, …) next to every value @default false */
   showValueTypes?: boolean;
 
+  /** Whether to show quotes around string values. Copy still produces valid JSON either way @default true */
+  withQuotes?: boolean;
+
+  /** Whether to show quotes around object keys. Array indices, `Map` and `Set` entries and group labels are never quoted @default false */
+  withKeyQuotes?: boolean;
+
   /** Whether to wrap the component in a Paper with a border @default false */
   withBorder?: boolean;
 
@@ -428,6 +435,8 @@ export const defaultProps: Partial<JsonTreeProps> = {
   editableTypes: ['string', 'number', 'boolean'],
   sortKeys: false,
   showValueTypes: false,
+  withQuotes: true,
+  withKeyQuotes: false,
 };
 
 /** Cut a string at `limit` characters without splitting a surrogate pair (an emoji, say) in two */
@@ -445,19 +454,24 @@ function truncateString(text: string, limit: number) {
 function CollapsibleString({
   value,
   limit,
+  withQuotes,
   getStyles,
   children,
 }: {
   value: string;
   limit: number;
+  withQuotes: boolean;
   getStyles: ReturnType<typeof useStyles<JsonTreeFactory>>;
   children: (display: string) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const quote = withQuotes ? '"' : '';
 
   return (
     <>
-      {children(open ? `"${value}"` : `"${truncateString(value, limit)}…"`)}
+      {children(
+        open ? `${quote}${value}${quote}` : `${quote}${truncateString(value, limit)}…${quote}`
+      )}
       <UnstyledButton
         {...getStyles('showMore')}
         aria-expanded={open}
@@ -600,6 +614,7 @@ function renderJSONNode(
     depth = 0,
     pathSegments,
     chunk,
+    parentType,
   } = jsonNode.nodeData || {
     type: 'null' as ValueType,
     value: null,
@@ -618,7 +633,11 @@ function renderJSONNode(
     collapseStringsAfterLength,
     showValueTypes,
     highlightNode,
+    withQuotes = true,
+    withKeyQuotes = false,
   } = props;
+
+  const displayKey = key !== undefined ? formatKey(key, parentType, withKeyQuotes) : undefined;
 
   // A `[start…end]` group is not a node of the data: nothing to highlight or to type
   const highlight =
@@ -731,10 +750,10 @@ function renderJSONNode(
       >
         {lineNumber}
         {renderIndentGuides()}
-        {key !== undefined && (
+        {displayKey !== undefined && (
           <>
             <Text component="span" {...getStyles('key')} data-key={key}>
-              {ctx.searchQuery ? highlightText(String(key), ctx.searchQuery, getStyles) : key}
+              {ctx.searchQuery ? highlightText(displayKey, ctx.searchQuery, getStyles) : displayKey}
             </Text>
             <Text component="span" {...getStyles('keyValueSeparator')}>
               :
@@ -742,7 +761,7 @@ function renderJSONNode(
           </>
         )}
         {(() => {
-          const formattedValue = formatValue(value, type);
+          const formattedValue = formatValue(value, type, withQuotes);
           // Segments, not the display path: two different nodes can share a path
           // string, and editing must never be ambiguous about which one it means.
           const editKey = pathSegments ? JSON.stringify(pathSegments) : null;
@@ -810,6 +829,7 @@ function renderJSONNode(
               <CollapsibleString
                 value={value as string}
                 limit={collapseLimit}
+                withQuotes={withQuotes}
                 getStyles={getStyles}
               >
                 {renderValue}
@@ -892,10 +912,10 @@ function renderJSONNode(
         {expandCollapseIcon}
       </ActionIcon>
 
-      {key !== undefined && (
+      {displayKey !== undefined && (
         <>
           <Text component="span" {...getStyles('key')}>
-            {ctx.searchQuery ? highlightText(String(key), ctx.searchQuery, getStyles) : key}
+            {ctx.searchQuery ? highlightText(displayKey, ctx.searchQuery, getStyles) : displayKey}
           </Text>
           <Text component="span" {...getStyles('keyValueSeparator')}>
             :
@@ -1068,6 +1088,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     collapseStringsAfterLength: _collapseStringsAfterLength,
     highlightNode: _highlightNode,
     showValueTypes: _showValueTypes,
+    withQuotes,
+    withKeyQuotes,
 
     classNames,
     style,
@@ -1337,8 +1359,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
 
   // Search results
   const searchResults = useMemo(
-    () => searchTree(treeData, debouncedQuery),
-    [treeData, debouncedQuery]
+    () => searchTree(treeData, debouncedQuery, { withQuotes, withKeyQuotes }),
+    [treeData, debouncedQuery, withQuotes, withKeyQuotes]
   );
 
   // Filtered tree data for search (hide non-matching nodes)
