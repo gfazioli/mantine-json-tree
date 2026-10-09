@@ -10,6 +10,7 @@ import {
   filterTreeBySearch,
   getArrayGroupSize,
   getTypeLabel,
+  limitTreeEntries,
   searchTree,
   stringifyValue,
 } from './lib/utils';
@@ -1636,6 +1637,150 @@ describe('allExpanded', () => {
     expect(container.textContent).toContain('"abcdef…"');
     await userEvent.click(getByRole('button', { name: 'show more' }));
     expect(container.textContent).toContain('"abcdefghij"');
+  });
+});
+
+describe('maxDisplayLength', () => {
+  const keys = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`k${i}`, i]));
+  const items = Array.from({ length: 7 }, (_, i) => `item-${i}`);
+  const convert = (value: unknown, groupArraysAfterLength?: number) =>
+    convertToTreeData(value, 'root', 'root', 0, 'as-string', [], [], { groupArraysAfterLength });
+  const moreButton = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-json-tree-more]');
+  const row = (container: HTMLElement, path: string) =>
+    Array.from(container.querySelectorAll<HTMLElement>('li[role="treeitem"]')).find(
+      (li) => li.getAttribute('data-value') === path
+    );
+
+  describe('limitTreeEntries', () => {
+    it('keeps the first entries and closes the container with a more row', () => {
+      const [root] = limitTreeEntries([convert(keys)], 2);
+      const children = root.children as any[];
+      expect(children.map((c) => c.nodeData.key)).toEqual(['k0', 'k1', undefined]);
+      expect(children[2].nodeData.more).toEqual({
+        container: 'root',
+        hidden: 3,
+        next: 'root.k2',
+        unit: 'keys',
+      });
+      expect(children[2].nodeData.depth).toBe(1);
+    });
+
+    it('limits nested containers too, and names their entries', () => {
+      const [root] = limitTreeEntries(
+        [convert({ list: items, m: new Map(items.map((v) => [v, v])), s: new Set(items) })],
+        3
+      );
+      const units = (root.children as any[]).map((c) => c.children.at(-1).nodeData.more.unit);
+      expect(units).toEqual(['items', 'entries', 'items']);
+    });
+
+    it('shows as many entries as were revealed', () => {
+      const [root] = limitTreeEntries([convert(items)], 2, { root: 6 });
+      const children = root.children as any[];
+      expect(children).toHaveLength(7);
+      expect(children[6].nodeData.more.hidden).toBe(1);
+      const [all] = limitTreeEntries([convert(items)], 2, { root: 8 });
+      expect((all.children as any[]).some((c) => c.nodeData.more)).toBe(false);
+    });
+
+    it('leaves a grouped array and its groups whole', () => {
+      const [root] = limitTreeEntries([convert({ list: items }, 3)], 1);
+      const list = (root.children as any[])[0];
+      expect(list.children.map((c: any) => c.label)).toEqual(['[0…2]', '[3…5]', '[6…6]']);
+      expect(list.children[0].children).toHaveLength(3);
+    });
+
+    it('never touches a container that fits', () => {
+      const tree = convert({ a: 1, b: 2 });
+      const [root] = limitTreeEntries([tree], 2);
+      expect(root.children).toHaveLength(2);
+    });
+  });
+
+  it('shows every entry by default', () => {
+    const { container } = render(<JsonTree data={keys} defaultExpanded />);
+    expect(moreButton(container)).toBeNull();
+    expect(container.textContent).toContain('k4');
+  });
+
+  it('renders the more row and reveals the next page on click, focusing it', async () => {
+    const { container } = render(
+      <JsonTree data={{ list: items }} defaultExpanded maxDepth={-1} maxDisplayLength={3} />
+    );
+    expect(container.textContent).toContain('item-2');
+    expect(container.textContent).not.toContain('item-3');
+    expect(moreButton(container)).toHaveTextContent('… 4 more items');
+
+    await userEvent.click(moreButton(container)!);
+    expect(container.textContent).toContain('item-5');
+    expect(container.textContent).not.toContain('item-6');
+    expect(moreButton(container)).toHaveTextContent('… 1 more items');
+    await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.list.3')));
+
+    await userEvent.click(moreButton(container)!);
+    expect(container.textContent).toContain('item-6');
+    expect(moreButton(container)).toBeNull();
+  });
+
+  it('reveals the next page with Enter on the focused row', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<JsonTree data={keys} defaultExpanded maxDisplayLength={2} />);
+    row(container, `root${'\u0000'}more`)!.focus();
+    await user.keyboard('{Enter}');
+    expect(container.textContent).toContain('k3');
+    await waitFor(() => expect(document.activeElement).toBe(row(container, 'root.k2')));
+  });
+
+  it('never hides a search match behind the limit', async () => {
+    const { container } = render(
+      <JsonTree
+        data={{ list: items }}
+        defaultExpanded
+        maxDisplayLength={2}
+        withSearch
+        searchQuery="item-6"
+        searchDebounce={0}
+      />
+    );
+    await waitFor(() => expect(container.textContent).toContain('item-6'));
+    expect(moreButton(container)).toBeNull();
+  });
+
+  it('copies, counts and expands the full value', async () => {
+    const { writeText, restore } = stubClipboard();
+    restoreClipboardAfter = restore;
+    const { container } = render(
+      <JsonTree
+        data={items}
+        defaultExpanded
+        maxDisplayLength={2}
+        withCopyAll
+        withKeyCountBadge
+        title="Items"
+      />
+    );
+    expect(container.querySelector('.keyCountBadge')).toHaveTextContent('7 items');
+    fireEvent.click(container.querySelector('.copyAllButton')!);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(JSON.stringify(items, null, 2)));
+  });
+
+  it('is never reported to highlightNode or onNodeClick', async () => {
+    const highlightNode = jest.fn(() => null);
+    const onNodeClick = jest.fn();
+    const { container } = render(
+      <JsonTree
+        data={keys}
+        defaultExpanded
+        maxDisplayLength={2}
+        highlightNode={highlightNode}
+        onNodeClick={onNodeClick}
+      />
+    );
+    const paths = new Set(highlightNode.mock.calls.map(([payload]: any) => payload.path));
+    expect(Array.from(paths)).toEqual(['root', 'root.k0', 'root.k1']);
+    await userEvent.click(moreButton(container)!);
+    expect(onNodeClick).not.toHaveBeenCalled();
   });
 });
 

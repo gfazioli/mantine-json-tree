@@ -37,7 +37,76 @@ export interface JSONTreeNodeData extends TreeNodeData {
      * `Set` entry and a group label, which it never does.
      */
     parentType?: ValueType;
+    /**
+     * Set on the synthetic row `maxDisplayLength` closes a long container with.
+     * It is not a value of the data: it stands for the entries left out.
+     */
+    more?: JsonTreeMoreRow;
   };
+}
+
+/** The row that stands for the entries `maxDisplayLength` left out of a container */
+export interface JsonTreeMoreRow {
+  /** The tree value (display path) of the container */
+  container: string;
+  /** How many entries are hidden */
+  hidden: number;
+  /** The tree value of the first hidden entry, the one revealing more focuses */
+  next: string;
+  /** What the hidden entries are called */
+  unit: 'items' | 'keys' | 'entries';
+}
+
+/**
+ * Suffix of a "more" row's tree value. A NUL character never appears in a
+ * display path built from a real key and a root name a person typed, so the
+ * row cannot collide with a node of the data.
+ */
+export const MORE_ROW_SUFFIX = '\u0000more';
+
+/**
+ * Cut every container to its first `limit` entries (or as many as were
+ * revealed for it) and close it with a "more" row. An array split into
+ * `[start…end]` groups and the groups themselves are left whole: grouping
+ * already keeps a long array short, as in Mantine's JsonViewer.
+ */
+export function limitTreeEntries(
+  nodes: JSONTreeNodeData[],
+  limit: number,
+  revealed: Record<string, number> = {}
+): JSONTreeNodeData[] {
+  return nodes.map((node) => {
+    const children = node.children as JSONTreeNodeData[] | undefined;
+    if (!children || children.length === 0) {
+      return node;
+    }
+    const nd = node.nodeData;
+    const exempt = Boolean(nd?.chunk || children[0]?.nodeData?.chunk);
+    const shown = exempt ? children.length : Math.max(limit, revealed[node.value] ?? limit);
+    const visible = limitTreeEntries(children.slice(0, shown), limit, revealed);
+    if (children.length <= shown) {
+      return { ...node, children: visible };
+    }
+
+    const type = nd?.type ?? 'object';
+    const more: JSONTreeNodeData = {
+      value: `${node.value}${MORE_ROW_SUFFIX}`,
+      label: '',
+      nodeData: {
+        type,
+        value: undefined,
+        path: nd?.path ?? node.value,
+        depth: (nd?.depth ?? 0) + 1,
+        more: {
+          container: node.value,
+          hidden: children.length - shown,
+          next: children[shown].value,
+          unit: type === 'object' ? 'keys' : type === 'map' ? 'entries' : 'items',
+        },
+      },
+    };
+    return { ...node, children: [...visible, more] };
+  });
 }
 
 /** Display options that change the shape of the tree, not its values. */
