@@ -328,3 +328,15 @@
     text-decoration: underline;
   }
 }
+
+.moreItems {
+  font-family: var(--mantine-font-family);
+  font-size: 0.85em;
+  color: var(--mantine-color-dimmed);
+  padding: 0 6px;
+
+  &:hover {
+    color: var(--mantine-color-anchor);
+    text-decoration: underline;
+  }
+}

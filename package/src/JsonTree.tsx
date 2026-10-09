@@ -53,8 +53,11 @@ import {
   getItemCount,
   getTypeLabel,
   isExpandable,
+  limitTreeEntries,
+  MORE_ROW_SUFFIX,
   searchTree,
   stringifyValue,
+  type JsonTreeMoreRow,
   type JSONTreeNodeData,
   type ValueType,
 } from './lib/utils';
@@ -84,7 +87,8 @@ export type JsonTreeStylesNames =
   | 'lineNumber'
   | 'valueEditor'
   | 'typeBadge'
-  | 'showMore';
+  | 'showMore'
+  | 'moreItems';
 
 export type JsonTreeCssVariables = {
   root:
@@ -137,6 +141,7 @@ export type JsonTreeCssVariables = {
   valueEditor: never;
   typeBadge: never;
   showMore: never;
+  moreItems: never;
 };
 
 export interface JsonTreeBaseProps {
@@ -250,6 +255,16 @@ export interface JsonTreeBaseProps {
 
   /** Truncate string values longer than this many characters, with a toggle to show the full text */
   collapseStringsAfterLength?: number;
+
+  /**
+   * Show at most this many entries of an object, array, `Map` or `Set`, and close
+   * it with a "… N more items" row that reveals the next as many on click (or
+   * Enter). An array split by `groupArraysAfterLength` is left whole, and so is
+   * every container while a search is active. Copy, search and expand all always
+   * work on the full value.
+   * @default false
+   */
+  maxDisplayLength?: number | false;
 
   /** Return how a node changed to highlight it diff-style, or `null` to leave it as is. Not called for the `[start…end]` groups of `groupArraysAfterLength` */
   highlightNode?: (payload: JsonTreeHighlightPayload) => JsonTreeHighlight | null | undefined;
@@ -515,6 +530,8 @@ interface RenderNodeContext {
   onExpandedChange?: (expanded: string[]) => void;
   /** `allExpanded`: every node is open and none can be collapsed */
   locked?: boolean;
+  /** Reveal the next page of a container cut by `maxDisplayLength` */
+  onRevealMore?: (more: JsonTreeMoreRow, scope: HTMLElement | null) => void;
   searchQuery?: string;
   matchedPaths?: Set<string>;
   directMatches?: Set<string>;
@@ -651,9 +668,9 @@ function renderJSONNode(
 
   const displayKey = key !== undefined ? formatKey(key, parentType, withKeyQuotes) : undefined;
 
-  // A `[start…end]` group is not a node of the data: nothing to highlight or to type
+  // A `[start…end]` group and a "more" row are not nodes of the data: nothing to highlight or to type
   const highlight =
-    !chunk && highlightNode
+    !chunk && !jsonNode.nodeData?.more && highlightNode
       ? (highlightNode({ path, pathSegments, key, type, value }) ?? undefined)
       : undefined;
 
@@ -741,6 +758,33 @@ function renderJSONNode(
     ) : (
       content
     );
+
+  // The row `maxDisplayLength` closes a long container with
+  const more = jsonNode.nodeData?.more;
+  if (more) {
+    return (
+      <Group
+        gap={4}
+        wrap="nowrap"
+        {...elementProps}
+        onClick={undefined}
+        style={{ position: 'relative' }}
+      >
+        {lineNumber}
+        {renderIndentGuides()}
+        <UnstyledButton
+          {...getStyles('moreItems')}
+          data-json-tree-more
+          onClick={(event: React.MouseEvent<HTMLElement>) => {
+            event.stopPropagation();
+            ctx.onRevealMore?.(more, event.currentTarget.closest<HTMLElement>('[data-tree-root]'));
+          }}
+        >
+          … {more.hidden} more {more.unit}
+        </UnstyledButton>
+      </Group>
+    );
+  }
 
   // Render primitive value
   if (!hasChildren) {
@@ -1041,6 +1085,7 @@ const varsResolver = createVarsResolver<JsonTreeFactory>(
       valueEditor: {},
       typeBadge: {},
       showMore: {},
+      moreItems: {},
     };
   }
 );
@@ -1101,6 +1146,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     sortKeys,
     groupArraysAfterLength,
     collapseStringsAfterLength: _collapseStringsAfterLength,
+    maxDisplayLength,
     highlightNode: _highlightNode,
     showValueTypes: _showValueTypes,
     withQuotes,
@@ -1321,6 +1367,24 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   // Keyboard handler for Ctrl+C copy on focused node
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
+      // Enter on a focused "more" row reveals the next page, like a click on it
+      if (
+        e.key === 'Enter' &&
+        !(e.target as HTMLElement | null)?.closest?.(KEYBOARD_ACTIVATED_SELECTOR)
+      ) {
+        const row = (e.target as HTMLElement | null)?.closest?.('[role="treeitem"]');
+        if (row?.getAttribute('data-value')?.endsWith(MORE_ROW_SUFFIX)) {
+          const button = Array.from(
+            row.querySelectorAll<HTMLElement>('[data-json-tree-more]')
+          ).find((el) => el.closest('[role="treeitem"]') === row);
+          if (button) {
+            e.preventDefault();
+            button.click();
+            return;
+          }
+        }
+      }
+
       // Enter edits the focused row. Routing it through the cell's own click
       // keeps one code path for mouse and keyboard — and, more importantly,
       // avoids giving every value its own tab stop just to be reachable.
@@ -1411,13 +1475,53 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     [treeData, debouncedQuery, withQuotes, withKeyQuotes]
   );
 
-  // Filtered tree data for search (hide non-matching nodes)
+  // How many entries `maxDisplayLength` shows of each container a reader asked to see more of
+  const [revealed, setRevealed] = useState<Record<string, number>>({});
+  const displayLimit =
+    typeof maxDisplayLength === 'number' && Number.isFinite(maxDisplayLength)
+      ? Math.max(1, Math.floor(maxDisplayLength))
+      : 0;
+
+  // Filtered tree data for search (hide non-matching nodes). While searching the
+  // entry limit is off, so a match past the cut is never hidden behind a "more" row.
   const filteredTreeData = useMemo(() => {
     if (!debouncedQuery || searchResults.matchedPaths.size === 0) {
-      return treeData;
+      return displayLimit ? limitTreeEntries(treeData, displayLimit, revealed) : treeData;
     }
     return filterTreeBySearch(treeData, searchResults.matchedPaths);
-  }, [treeData, debouncedQuery, searchResults]);
+  }, [treeData, debouncedQuery, searchResults, displayLimit, revealed]);
+
+  // A row to focus once the tree has re-rendered: the first entry a "more" row
+  // revealed. Without it focus falls to the body when the row it was on goes away.
+  const [pendingFocus, setPendingFocus] = useState<{
+    path: string;
+    scope: HTMLElement | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!pendingFocus) {
+      return;
+    }
+    setPendingFocus(null);
+    const target = Array.from(
+      pendingFocus.scope?.querySelectorAll<HTMLElement>('li[role="treeitem"]') ?? []
+    ).find((li) => li.getAttribute('data-value') === pendingFocus.path);
+    if (target) {
+      target.setAttribute('data-focus-ring', 'true');
+      target.focus();
+    }
+  }, [pendingFocus, filteredTreeData]);
+
+  const handleRevealMore = useCallback(
+    (more: JsonTreeMoreRow, scope: HTMLElement | null) => {
+      setRevealed((current) => ({
+        ...current,
+        [more.container]: (current[more.container] ?? displayLimit) + displayLimit,
+      }));
+      setPendingFocus({ path: more.next, scope });
+    },
+    [displayLimit]
+  );
 
   // Auto-expand to show search results
   useEffect(() => {
@@ -1503,6 +1607,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     onCollapse,
     onExpandedChange,
     locked: allExpanded,
+    onRevealMore: handleRevealMore,
     searchQuery: debouncedQuery || undefined,
     matchedPaths: debouncedQuery ? searchResults.matchedPaths : undefined,
     directMatches: debouncedQuery ? searchResults.directMatches : undefined,
