@@ -28,6 +28,11 @@ export function isWritableContainer(value: unknown): value is Record<string, unk
   return proto === Object.prototype || proto === null;
 }
 
+/** Whether `index` is a whole number in `[0, length)` */
+function isIndexIn(index: number, length: number) {
+  return Number.isInteger(index) && index >= 0 && index < length;
+}
+
 /**
  * Return a copy of `root` with the value at `segments` replaced.
  *
@@ -55,7 +60,7 @@ export function setValueAtPath<T>(root: T, segments: JsonTreePathSegments, value
 
   if (Array.isArray(root)) {
     const index = typeof segment === 'number' ? segment : Number(segment);
-    if (!Number.isInteger(index) || index < 0 || index >= root.length) {
+    if (!isIndexIn(index, root.length)) {
       throw new Error(`JsonTree: index ${String(segment)} is out of range for this array.`);
     }
     const next: unknown[] = [...root];
@@ -141,7 +146,7 @@ export function removeAtPath<T>(root: T, segments: JsonTreePathSegments): T {
   const container = containerAt(root, parent);
   if (Array.isArray(container)) {
     const index = typeof last === 'number' ? last : Number(last);
-    if (!Number.isInteger(index) || index < 0 || index >= container.length) {
+    if (!isIndexIn(index, container.length)) {
       throw new Error(`JsonTree: index ${String(last)} is out of range for this array.`);
     }
     return setValueAtPath(
@@ -175,7 +180,8 @@ export function insertAtPath<T>(
   const container = containerAt(root, segments);
   if (Array.isArray(container)) {
     const index = key === undefined ? container.length : Number(key);
-    if (!Number.isInteger(index) || index < 0 || index > container.length) {
+    // an insert may land just past the last item
+    if (!isIndexIn(index, container.length + 1)) {
       throw new Error(`JsonTree: index ${String(key)} is out of range for this array.`);
     }
     return setValueAtPath(root, segments, [
@@ -204,8 +210,7 @@ export function moveAtPath<T>(root: T, segments: JsonTreePathSegments, toIndex: 
   if (!Array.isArray(container) || typeof last !== 'number') {
     throw new Error('JsonTree: only an array item can be moved.');
   }
-  const inRange = (i: number) => Number.isInteger(i) && i >= 0 && i < container.length;
-  if (!inRange(last) || !inRange(toIndex)) {
+  if (!isIndexIn(last, container.length) || !isIndexIn(toIndex, container.length)) {
     throw new Error(`JsonTree: cannot move item ${last} to ${toIndex} in this array.`);
   }
   const next = [...container];

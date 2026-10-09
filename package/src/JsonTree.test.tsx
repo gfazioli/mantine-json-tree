@@ -1657,7 +1657,7 @@ describe('maxDisplayLength', () => {
   const convert = (value: unknown, groupArraysAfterLength?: number) =>
     convertToTreeData(value, 'root', 'root', 0, 'as-string', [], [], { groupArraysAfterLength });
   const moreButton = (container: HTMLElement) =>
-    container.querySelector<HTMLElement>('[data-json-tree-more]');
+    container.querySelector<HTMLElement>('[data-json-tree-action="reveal"]');
   const row = (container: HTMLElement, path: string) =>
     Array.from(container.querySelectorAll<HTMLElement>('li[role="treeitem"]')).find(
       (li) => li.getAttribute('data-value') === path
@@ -1847,7 +1847,7 @@ describe('structural edits', () => {
       <JsonTree data={profile} editable defaultExpanded maxDepth={-1} onChange={() => {}} />
     );
     expect(a.querySelector('[data-json-tree-action]')).toBeNull();
-    expect(a.querySelector('[data-renamable]')).toBeNull();
+    expect(a.querySelector('[data-json-tree-action="rename"]')).toBeNull();
 
     const { container: b } = render(
       <JsonTree data={profile} structuralEdits defaultExpanded maxDepth={-1} />
@@ -1863,7 +1863,7 @@ describe('structural edits', () => {
       )
     );
     expect(Array.from(actions)).toEqual(['remove']);
-    expect(container.querySelector('[data-renamable]')).toBeNull();
+    expect(container.querySelector('[data-json-tree-action="rename"]')).toBeNull();
   });
 
   it('puts each control only where it makes sense', () => {
@@ -1872,11 +1872,11 @@ describe('structural edits', () => {
     expect(action(container, 'root', 'add')).toBeDefined();
     expect(action(container, 'root', 'remove')).toBeUndefined();
     // an object key can be renamed and removed, not moved
-    expect(own(container, 'root.name', '[data-renamable]')).toBeDefined();
+    expect(own(container, 'root.name', '[data-json-tree-action="rename"]')).toBeDefined();
     expect(action(container, 'root.name', 'move-up')).toBeUndefined();
     // an array item can be moved and removed, not renamed
     expect(action(container, 'root.tags.1', 'move-up')).toBeDefined();
-    expect(own(container, 'root.tags.1', '[data-renamable]')).toBeUndefined();
+    expect(own(container, 'root.tags.1', '[data-json-tree-action="rename"]')).toBeUndefined();
     // the ends of an array cannot move past them
     expect(action(container, 'root.tags.0', 'move-up')).toBeDisabled();
     expect(action(container, 'root.tags.2', 'move-down')).toBeDisabled();
@@ -1906,7 +1906,7 @@ describe('structural edits', () => {
       />
     );
     expect(action(container, 'root.address', 'remove')).toBeUndefined();
-    expect(own(container, 'root.address', '[data-renamable]')).toBeUndefined();
+    expect(own(container, 'root.address', '[data-json-tree-action="rename"]')).toBeUndefined();
     expect(action(container, 'root.age', 'remove')).toBeDefined();
   });
 
@@ -2029,6 +2029,19 @@ describe('structural edits', () => {
       await waitFor(() =>
         expect(document.activeElement).toBe(row(container, 'root.address.country'))
       );
+    });
+
+    it('never asks highlightNode about the new-key row', async () => {
+      const user = userEvent.setup();
+      const highlightNode = jest.fn(() => null);
+      const { container } = render(
+        <Controlled initial={{ address: { city: 'Rome' } }} highlightNode={highlightNode} />
+      );
+      highlightNode.mockClear();
+      await user.click(action(container, 'root.address', 'add')!);
+      expect(input(container)).toHaveAttribute('aria-label', 'New key');
+      const values = highlightNode.mock.calls.map(([payload]: any) => payload.value);
+      expect(values).not.toContain('');
     });
 
     it('rejects a key the object already has', async () => {

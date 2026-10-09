@@ -63,11 +63,38 @@ export interface JsonTreeMoreRow {
 }
 
 /**
- * Suffix of a "more" row's tree value. A NUL character never appears in a
- * display path built from a real key and a root name a person typed, so the
- * row cannot collide with a node of the data.
+ * Suffixes of the synthetic rows' tree values. Nothing reads them — the rows
+ * are told apart by `nodeData.more` / `nodeData.draft` — they only keep the
+ * values unique. A NUL is unlikely in a real key but not impossible, the same
+ * kind of collision as `{ 'a.b' }` against `{ a: { b } }`.
  */
-export const MORE_ROW_SUFFIX = '\u0000more';
+const MORE_ROW_SUFFIX = '\u0000more';
+const DRAFT_ROW_SUFFIX = '\u0000new';
+
+/** The tree value of an entry: its container's tree value and its key, dot-joined */
+export function childTreeValue(container: string, key: string | number) {
+  return `${container}.${key}`;
+}
+
+/** The `[start…end]` label of the group holding `index` in an array of `length` items, `size` per group */
+export function getArrayGroupLabel(index: number, size: number, length: number) {
+  const start = Math.floor(index / size) * size;
+  return `[${start}…${Math.min(start + size, length) - 1}]`;
+}
+
+/** Map `visit` over `nodes`, handing back the same array when it changed no node */
+function mapNodes(
+  nodes: JSONTreeNodeData[],
+  visit: (node: JSONTreeNodeData) => JSONTreeNodeData
+): JSONTreeNodeData[] {
+  let changed = false;
+  const next = nodes.map((node) => {
+    const visited = visit(node);
+    changed ||= visited !== node;
+    return visited;
+  });
+  return changed ? next : nodes;
+}
 
 /**
  * Cut every container to its first `limit` entries (or as many as were
@@ -80,7 +107,7 @@ export function limitTreeEntries(
   limit: number,
   revealed: Record<string, number> = {}
 ): JSONTreeNodeData[] {
-  return nodes.map((node) => {
+  return mapNodes(nodes, (node) => {
     const children = node.children as JSONTreeNodeData[] | undefined;
     if (!children || children.length === 0) {
       return node;
@@ -88,10 +115,11 @@ export function limitTreeEntries(
     const nd = node.nodeData;
     const exempt = Boolean(nd?.chunk || children[0]?.nodeData?.chunk);
     const shown = exempt ? children.length : Math.max(limit, revealed[node.value] ?? limit);
-    const visible = limitTreeEntries(children.slice(0, shown), limit, revealed);
     if (children.length <= shown) {
-      return { ...node, children: visible };
+      const visible = limitTreeEntries(children, limit, revealed);
+      return visible === children ? node : { ...node, children: visible };
     }
+    const visible = limitTreeEntries(children.slice(0, shown), limit, revealed);
 
     const type = nd?.type ?? 'object';
     const more: JSONTreeNodeData = {
@@ -585,7 +613,7 @@ export function convertToTreeData(
     convertToTreeData(
       v,
       k,
-      `${path}.${k}`,
+      childTreeValue(path, k),
       childDepth,
       displayFunctions,
       childAncestors,
@@ -614,8 +642,8 @@ export function convertToTreeData(
       if (groupChildren.length === 0) {
         continue;
       }
-      const label = `[${start}…${end}]`;
-      const chunkPath = `${path}.${label}`;
+      const label = getArrayGroupLabel(start, groupSize, entries.length);
+      const chunkPath = childTreeValue(path, label);
       children.push({
         value: chunkPath,
         label,
@@ -788,12 +816,9 @@ export function findNodeByPath(
   return null;
 }
 
-/** Suffix of the "new key" row's tree value; NUL keeps it apart from every real path */
-export const DRAFT_ROW_SUFFIX = '\u0000new';
-
 /** Close the container whose tree value is `container` with a "new key" row. */
 export function appendDraftRow(nodes: JSONTreeNodeData[], container: string): JSONTreeNodeData[] {
-  return nodes.map((node) => {
+  return mapNodes(nodes, (node) => {
     const children = node.children as JSONTreeNodeData[] | undefined;
     if (node.value === container) {
       const nd = node.nodeData;
@@ -810,7 +835,8 @@ export function appendDraftRow(nodes: JSONTreeNodeData[], container: string): JS
       };
       return { ...node, children: [...(children ?? []), draft] };
     }
-    return children ? { ...node, children: appendDraftRow(children, container) } : node;
+    const next = children && appendDraftRow(children, container);
+    return next && next !== children ? { ...node, children: next } : node;
   });
 }
 
@@ -870,7 +896,7 @@ export function remapContainerEntries(
       continue;
     }
     const mapped = mapKey(key);
-    const next = mapped === null ? null : `${container}.${mapped}`;
+    const next = mapped === null ? null : childTreeValue(container, mapped);
     if (next !== entry.value) {
       walk(entry, entry.value, next);
     }
