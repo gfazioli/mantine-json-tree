@@ -42,6 +42,15 @@ export const configurator: MantineDemo = {
     { type: 'boolean', prop: 'withKeyQuotes', initialValue: false, libraryValue: false },
     { type: 'boolean', prop: 'allExpanded', initialValue: false, libraryValue: false },
     {
+      type: 'number',
+      prop: 'indentWidth',
+      initialValue: 32,
+      libraryValue: 32,
+      min: 12,
+      max: 64,
+      step: 4,
+    },
+    {
       type: 'select',
       prop: 'displayFunctions',
       initialValue: 'as-string',

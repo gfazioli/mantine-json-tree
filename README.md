@@ -38,6 +38,8 @@ Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTr
 - **Large data**: long arrays split into collapsible `[start…end]` groups (`groupArraysAfterLength`), long strings cut with a "show more" toggle (`collapseStringsAfterLength`), and long objects or arrays cut to their first entries with a "… N more" row that reveals the next page (`maxDisplayLength`)
 - **Locked expansion**: every node open and none collapsible (`allExpanded`)
 - **Quote style**: show or hide the quotes around strings and keys (`withQuotes`, `withKeyQuotes`)
+- **Translatable labels** for every built-in string, and an accessible name on every icon button (`labels`)
+- **Indentation width** (`indentWidth`) and a root without a label (`rootName={false}`)
 - **Type badges** next to every value (`showValueTypes`) and **sorted keys** (`sortKeys`)
 - **Redesigned toolbar** with key count badge, global copy, search toggle, and modern icons
 - **Paper wrapper** with `withBorder` for bordered container look

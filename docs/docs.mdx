@@ -11,6 +11,8 @@ import * as demos from './demos';
 - **Entry limit** — long objects and arrays end with a "… N more" row that reveals the next page (`maxDisplayLength`)
 - **Locked expansion** — every node open, none can be collapsed (`allExpanded`)
 - **Quote style** — show or hide the quotes around strings and keys (`withQuotes`, `withKeyQuotes`)
+- **Labels** — translate every built-in string, and every icon button now has an accessible name (`labels`)
+- **Indentation width** (`indentWidth`) and a root without a label (`rootName={false}`)
 - **Diff highlighting** — mark nodes as added, removed or changed (`highlightNode`)
 - **Large arrays** split into collapsible `[start…end]` groups (`groupArraysAfterLength`)
 - **Long strings** cut with a "show more" toggle (`collapseStringsAfterLength`)
@@ -155,6 +157,21 @@ export const Cap = ({ title, note }) => (
     </Table.Tr>
     <Table.Tr>
       <Table.Td><Cap title="Quote style" note="withQuotes and withKeyQuotes in both, with the same defaults" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Indentation width" note="indentWidth in both: 32px per level by default here, 16px in core" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Root label" note="rootName names the root, or false hides it. The root is named 'root' by default here, unnamed in core" /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+      <Table.Td ta="center"><Yes /></Table.Td>
+    </Table.Tr>
+    <Table.Tr>
+      <Table.Td><Cap title="Translatable labels" note="labels replaces every built-in string, editor messages included, and names every icon button for screen readers; core takes copy, copied, expand all and collapse all" /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
       <Table.Td ta="center"><Yes /></Table.Td>
     </Table.Tr>
@@ -318,7 +335,9 @@ root node. Defaults to `"root"`. This is useful for API
 responses, config files, or when displaying multiple
 trees with different root labels. Note that `rootName`
 is display-only — it does not affect the copied JSON
-output:
+output. Pass `rootName={false}` to show the root without a label;
+paths keep their `root` prefix, so `expanded`, `onNodeClick` and
+the path tooltip are the same either way:
 
 <Demo data={demos.rootName} />
 
@@ -406,7 +425,7 @@ Set `sortKeys` to show object keys in alphabetical order, or pass a comparator s
 
 ## Indent Guides
 
-Display vertical lines to visualize nesting levels, similar to Visual Studio Code. The guides use 5 distinct colors that cycle for deeper nesting levels.
+Display vertical lines to visualize nesting levels, similar to Visual Studio Code. The guides use 5 distinct colors that cycle for deeper nesting levels. `indentWidth` sets how far each level is indented, in px (32 by default), and the guides follow it.
 
 <Demo data={demos.indentGuides} />
 
@@ -463,6 +482,19 @@ Use the `onNodeClick` callback to handle clicks on any node in the tree, and the
 - **Enter** on a "… N more items" row: reveal the next entries (`maxDisplayLength`)
 - With `structuralEdits`: **F2** renames the focused key, **Delete** / **Backspace** removes the
   focused row, **Insert** / **+** adds to it, and **Alt + Arrow Up/Down** moves an array item
+
+## Labels and Accessibility
+
+Every string `JsonTree` renders or announces on its own comes from `labels`, so a tree can be translated without touching the component. Pass only the ones to change; the rest keep their English defaults.
+
+The labels cover:
+- **Icon buttons**: copy, copied, copy all, expand all, collapse all, search, add, remove, move up and move down. Every icon button carries its label as its accessible name, so a screen reader announces "Copy" rather than an unnamed button. The toolbar's buttons also show it as a tooltip.
+- **Text on screen**: "show more" / "show less" and the "… N more items" row. `moreItems` is a function of the count and of the unit (`items`, `keys` or `entries`), for languages whose plurals follow different rules.
+- **Inline editors**: the names of the new-key, rename and value inputs (`rename` and `edit` take the key), and their validation messages (`keyExists`, `required`, `notANumber`).
+
+The search placeholder keeps its own prop, `searchPlaceholder`, and the key count badge its own `keyCountBadgeLabel`.
+
+<Demo data={demos.labels} />
 
 ## Path Tooltip
 

@@ -22,3 +22,4 @@ export { allExpanded } from './JsonTree.demo.allExpanded';
 export { entryLimit } from './JsonTree.demo.entryLimit';
 export { quotes } from './JsonTree.demo.quotes';
 export { structural } from './JsonTree.demo.structural';
+export { labels } from './JsonTree.demo.labels';
