@@ -54,7 +54,7 @@ Rollup bundles to dual ESM (`dist/esm/`) and CJS (`dist/cjs/`) with `'use client
 `JsonTree` uses Mantine's `factory<JsonTreeFactory>` which requires a `Factory` type declaring `props`, `ref`, `stylesNames`, and `vars`, plus `createVarsResolver` to map props to CSS custom properties, `useProps` for default prop merging, and `useStyles` for the `getStyles` accessor.
 
 ### Tree rendering
-The component converts arbitrary data to Mantine's `TreeNodeData` format via `convertToTreeData()` in `lib/utils.tsx`. This recursive function:
+The component converts arbitrary data to Mantine's `TreeNodeData` format via `convertToTreeData()` in `package/src/lib/utils.tsx`. This recursive function:
 - Detects value types via `getValueType()` — supports 16 types including `react-element`, `date`, `nan`, `infinity`, `bigint`, `symbol`, `regexp`, `map`, `set`
 - Builds a `JSONTreeNodeData` tree with `nodeData` metadata (type, value, key, path, itemCount, depth)
 - Handles functions via the `displayFunctions` prop: `'as-string'` (default), `'hide'` (filtered out), `'as-object'` (introspect properties)
@@ -66,7 +66,7 @@ The tree is rendered using Mantine's `<Tree>` component with a custom `renderNod
 The header/toolbar supports: `title`, `withKeyCountBadge` (shows "N keys" badge), `withExpandAll`, `withCopyAll` (global copy JSON), `withSearch` (search toggle). The `rootName` prop customizes the root node label (default "root"). `withBorder` wraps in Mantine `Paper`.
 
 ### Search
-When `withSearch` is enabled, a search bar filters the tree to show only matching branches. `searchTree()` in `lib/utils.tsx` performs recursive case-insensitive matching on keys and values, returning `matchedPaths` (all visible nodes), `directMatches` (nodes with actual hits), and `expandedPaths`. `filterTreeBySearch()` prunes the tree to keep only matched branches. Direct matches get amber row background; text portions are highlighted with `<span>` + `searchHighlight` selector. Pre-search expand state is saved and restored on clear.
+When `withSearch` is enabled, a search bar filters the tree to show only matching branches. `searchTree()` in `package/src/lib/utils.tsx` performs recursive case-insensitive matching on keys and values, returning `matchedPaths` (all visible nodes), `directMatches` (nodes with actual hits), and `expandedPaths`. `filterTreeBySearch()` prunes the tree to keep only matched branches. Direct matches get amber row background; text portions are highlighted with `<span>` + `searchHighlight` selector. Pre-search expand state is saved and restored on clear.
 
 ### Expansion control
 `defaultExpanded` + `maxDepth` props control initial state. `maxDepth: -1` expands all via `getTreeExpandedState(treeData, '*')`. Otherwise, a depth-limited traversal collects node values to expand. The `useTree` hook manages expand/collapse state.
