@@ -31,6 +31,12 @@ Set `editable` and the same tree becomes an editor: click a string or a number t
 
 Wrapped with Mantine layout primitives like Paper, Stack, and SimpleGrid, JsonTree integrates cleanly into dashboards, developer tools, and documentation pages where readable, navigable data visualization is essential.
 
+## Video tutorial
+
+[![Show an API response as a JSON tree | Mantine Extensions Tutorial 01](https://i.ytimg.com/vi/Y-fVP79Hg4I/maxresdefault.jpg)](https://www.youtube.com/watch?v=Y-fVP79Hg4I)
+
+**Show an API response as a JSON tree** (1:15): install JsonTree, render an API response with it, then make it searchable, show each value's path and copy any node. More in the [Mantine Extensions Tutorials](https://www.youtube.com/playlist?list=PLdYqZHmBU1Bk) playlist.
+
 ## Features
 
 - Interactive collapsible tree view for any JSON-serializable data
